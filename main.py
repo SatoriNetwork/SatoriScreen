@@ -31,6 +31,7 @@ import time
 import struct
 import machine
 import ujson
+import os
 
 # Wi-Fi credentials
 SSID = "YOUR-WIFI-SSID"
@@ -47,6 +48,9 @@ WALLET_ADDRESSES = [
     "EXfMF1w2x65eZtK3jKHuAa28EBngqW8RnC",
     "Ec1pNjD7CxDjQGcjyD3TZ4ayZ3thRkJqoM"
 ]
+
+
+STORAGE_FILE = "data.json"
 
 
 # Pin definitions
@@ -94,6 +98,113 @@ SATORI_BITMAP = [
     0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 32
 ]
 
+SATORI = [
+    0b00000011, 0b11111100, 0b00000000, 0b00000000,  # Row 1
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 2
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 3
+    0b00000000, 0b00001111, 0b11111111, 0b00000000,  # Row 4
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 5
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 6
+    0b00000000, 0b01111000, 0b00011111, 0b11111111,  # Row 7
+    0b10000000, 0b00000000, 0b00000000, 0b00000000,  # Row 8
+    0b11000000, 0b00000000, 0b00000000, 0b00000000,  # Row 9
+    0b00000000, 0b00000000, 0b01111100, 0b00111111,  # Row 10
+    0b00001111, 0b11000000, 0b00000000, 0b00000000,  # Row 11
+    0b00000000, 0b11100000, 0b00000000, 0b00000000,  # Row 12
+    0b00000000, 0b00000000, 0b00000000, 0b01111000,  # Row 13
+    0b00111100, 0b00000001, 0b10000000, 0b00000000,  # Row 14
+    0b00000000, 0b00000001, 0b11100000, 0b00000000,  # Row 15
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 16
+    0b01111000, 0b01111000, 0b00000000, 0b00000000,  # Row 17
+    0b00000000, 0b00000000, 0b00000001, 0b11100000,  # Row 18
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 19
+    0b00000000, 0b00000000, 0b01111000, 0b00000000,  # Row 20
+    0b00000000, 0b00000000, 0b00000000, 0b00000001,  # Row 21
+    0b11100000, 0b00000000, 0b00000000, 0b00000000,  # Row 22
+    0b00000000, 0b00000000, 0b00000000, 0b01111000,  # Row 23
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 24
+    0b00000001, 0b11110000, 0b00000000, 0b00000000,  # Row 25
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 26
+    0b01111000, 0b00000000, 0b00000000, 0b00001111,  # Row 27
+    0b11000000, 0b00000111, 0b11111000, 0b00000000,  # Row 28
+    0b00111111, 0b00000000, 0b00000000, 0b00000000,  # Row 29
+    0b00000000, 0b01111100, 0b00000000, 0b00000000,  # Row 30
+    0b00111111, 0b11110000, 0b00001111, 0b11111110,  # Row 31
+    0b00000001, 0b11111111, 0b11000000, 0b00000000,  # Row 32
+    0b00010000, 0b01110000, 0b00111110, 0b00000000,  # Row 33
+    0b00000000, 0b01111111, 0b11111000, 0b00001111,  # Row 34
+    0b11111110, 0b00000011, 0b10000000, 0b11110000,  # Row 35
+    0b00111000, 0b11111100, 0b01111000, 0b00111111,  # Row 36
+    0b00000000, 0b00000000, 0b01111000, 0b01111100,  # Row 37
+    0b00000111, 0b11111000, 0b00000110, 0b00001110,  # Row 38
+    0b00111000, 0b00111111, 0b11111100, 0b01111000,  # Row 39
+    0b00011111, 0b11000000, 0b00000000, 0b00000000,  # Row 40
+    0b00111100, 0b00000011, 0b11110000, 0b00001100,  # Row 41
+    0b01111111, 0b10011100, 0b00111111, 0b11111000,  # Row 42
+    0b01111000, 0b00001111, 0b11110000, 0b00000000,  # Row 43
+    0b00000000, 0b00011110, 0b00000011, 0b11100000,  # Row 44
+    0b00011001, 0b11111111, 0b11001100, 0b00111111,  # Row 45
+    0b10000000, 0b01111000, 0b00000011, 0b11111100,  # Row 46
+    0b00000000, 0b00000000, 0b00011110, 0b00000011,  # Row 47
+    0b11100000, 0b00110011, 0b11111111, 0b11100110,  # Row 48
+    0b00111111, 0b00000000, 0b01111000, 0b00000001,  # Row 49
+    0b11111111, 0b00000000, 0b00000000, 0b00011110,  # Row 50
+    0b00000011, 0b11100000, 0b00110011, 0b11111111,  # Row 51
+    0b11110010, 0b00111110, 0b00000000, 0b01111000,  # Row 52
+    0b00000000, 0b00111111, 0b10000000, 0b00000000,  # Row 53
+    0b11111110, 0b00000011, 0b11100000, 0b00100111,  # Row 54
+    0b11111111, 0b11110011, 0b00111110, 0b00000000,  # Row 55
+    0b01111000, 0b00000000, 0b00011111, 0b11000000,  # Row 56
+    0b00011111, 0b11111110, 0b00000011, 0b11100000,  # Row 57
+    0b01100111, 0b11111111, 0b11111011, 0b00111110,  # Row 58
+    0b00000000, 0b01111000, 0b00000000, 0b00000111,  # Row 59
+    0b11000000, 0b01111111, 0b11111110, 0b00000011,  # Row 60
+    0b11100000, 0b01100111, 0b11111111, 0b11111011,  # Row 61
+    0b00111110, 0b00000000, 0b01111000, 0b00000000,  # Row 62
+    0b00000011, 0b11100000, 0b11111000, 0b00011110,  # Row 63
+    0b00000011, 0b11100000, 0b01100111, 0b11111111,  # Row 64
+    0b11111011, 0b00111100, 0b00000000, 0b01111000,  # Row 65
+    0b00000000, 0b00000011, 0b11100000, 0b11100000,  # Row 66
+    0b00011110, 0b00000001, 0b11000000, 0b01100111,  # Row 67
+    0b11111111, 0b11111011, 0b00111100, 0b00000000,  # Row 68
+    0b01111000, 0b00000000, 0b00000001, 0b11100001,  # Row 69
+    0b11100000, 0b00011110, 0b00000001, 0b11100000,  # Row 70
+    0b01100111, 0b11110011, 0b11111011, 0b00111100,  # Row 71
+    0b00000000, 0b01111000, 0b00000000, 0b00000001,  # Row 72
+    0b11100001, 0b11100000, 0b00011110, 0b00000001,  # Row 73
+    0b11100000, 0b01100111, 0b11110011, 0b11111011,  # Row 74
+    0b00111100, 0b00000000, 0b01111000, 0b00000000,  # Row 75
+    0b00000011, 0b11100001, 0b11100000, 0b00011110,  # Row 76
+    0b00000001, 0b11100000, 0b00110011, 0b11110011,  # Row 77
+    0b11111010, 0b00111100, 0b00000000, 0b01111000,  # Row 78
+    0b11110000, 0b00000011, 0b11000001, 0b11100000,  # Row 79
+    0b00011110, 0b00000001, 0b11100000, 0b00110001,  # Row 80
+    0b11100001, 0b11110110, 0b00111100, 0b00000000,  # Row 81
+    0b01111000, 0b11111100, 0b00001111, 0b11000001,  # Row 82
+    0b11100000, 0b00111110, 0b00000001, 0b11110000,  # Row 83
+    0b00011001, 0b11100001, 0b11111110, 0b00111100,  # Row 84
+    0b00000000, 0b01111100, 0b01111111, 0b11111111,  # Row 85
+    0b10000001, 0b11111000, 0b01111110, 0b00000000,  # Row 86
+    0b11111110, 0b00011100, 0b00000000, 0b11111100,  # Row 87
+    0b00111100, 0b00000000, 0b01111100, 0b00111111,  # Row 88
+    0b11111111, 0b00000000, 0b11111111, 0b11111111,  # Row 89
+    0b00000000, 0b11111110, 0b00001110, 0b00000000,  # Row 90
+    0b00111000, 0b00111100, 0b00000000, 0b01111100,  # Row 91
+    0b00011111, 0b11111110, 0b00000000, 0b01111111,  # Row 92
+    0b11001110, 0b00000000, 0b01111110, 0b00000111,  # Row 93
+    0b10000000, 0b01110000, 0b00111000, 0b00000000,  # Row 94
+    0b01111000, 0b00000011, 0b11110000, 0b00000000,  # Row 95
+    0b00011110, 0b00000000, 0b00000000, 0b00000000,  # Row 96
+    0b00000001, 0b11111111, 0b11100000, 0b00000000,  # Row 97
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 98
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 99
+    0b00000000, 0b00000000, 0b01111111, 0b00000000,  # Row 100
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 101
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 102
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 103
+    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 104
+]
+
 LOLLIPOP_BITMAP = [
     0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 1
     0b00000000, 0b00000000, 0b00011111, 0b00000000,  # Row 2
@@ -129,6 +240,14 @@ LOLLIPOP_BITMAP = [
     0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 32
 ]
 
+
+
+
+
+
+
+
+
 # LUT for full update
 WS_20_30 = [                                    
     0x80,    0x66,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x40,    0x0,    0x0,    0x0,
@@ -151,6 +270,7 @@ WS_20_30 = [
     0x44,    0x44,    0x44,    0x44,    0x44,    0x44,    0x0,    0x0,    0x0,            
     0x22,    0x17,    0x41,    0x0,    0x32,    0x36
 ]
+
 
 WF_PARTIAL_2IN9 = [
     0x0,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
@@ -443,11 +563,19 @@ class ScaledText:
 
     def draw_bitmap(self, x, y, bitmap, width, height, color=0):
         """Draw a monochrome bitmap at a specified location."""
-        for row in range(height):
-            for col in range(width):
-                bit = (bitmap[row * (width // 8) + (col // 8)] >> (7 - (col % 8))) & 0x01
+        bytes_per_row = (width + 7) // 8  # Handle any width, including non-multiples of 8
+        
+        for row in range(height):  # Iterate over each row
+            for col in range(width):  # Iterate over each column
+                # Calculate the byte and bit position
+                byte_index = row * bytes_per_row + (col // 8)
+                bit_index = 7 - (col % 8)
+                
+                # Extract the bit from the bitmap
+                bit = (bitmap[byte_index] >> bit_index) & 0x01
                 if bit:
                     self.fb.pixel(x + col, y + row, color)
+
                     
     def draw_scaled_text(self, text, x, y, scale=2, color=0):
         """Draw text with custom scaling factor.
@@ -597,6 +725,28 @@ def fetch_neurons_data():
         except:
             pass
 
+def load_previous_data():
+    """Load previous day's SATORI and EVR values from storage."""
+    try:
+        if STORAGE_FILE in os.listdir():
+            with open(STORAGE_FILE, "r") as file:
+                data = ujson.load(file)
+                return data
+        else:
+            return {"SATORI": 0.0, "EVR": 0.0}  # Default values
+    except Exception as e:
+        print("Error loading previous data:", e)
+        return {"SATORI": 0.0, "EVR": 0.0}
+
+def save_current_data(satori, evr):
+    """Save the current day's SATORI and EVR values to storage."""
+    try:
+        data = {"SATORI": satori, "EVR": evr}
+        with open(STORAGE_FILE, "w") as file:
+            ujson.dump(data, file)
+    except Exception as e:
+        print("Error saving data:", e)
+
 
 
 
@@ -635,9 +785,10 @@ def main():
     epd.fill(1)
 
     # Display SATORI section
-    text_handler.draw_scaled_text("SATORI", 30, 0, scale=3)
+    #text_handler.draw_scaled_text("SATORI", 30, 0, scale=3)
     #text_handler.draw_bitmap((128*2)+5, 0, SATORI_BITMAP, 32, 32)
-    text_handler.draw_bitmap(0, 0, SATORI_BITMAP, 32, 32)
+    #text_handler.draw_bitmap(0, 0, SATORI_BITMAP, 32, 32)
+    text_handler.draw_bitmap(0, 0, SATORI, 103, 32)
     
     text_handler.draw_scaled_text(f"{satori_balance:.2f}", 0, 40, scale=3)
     
@@ -658,7 +809,7 @@ def main():
 
     
     # Draw EVRMORE balance
-    text_handler.draw_scaled_text(f"EVR: {evr_balance:.2f}", 0, 112-16-8, scale=2)
+    text_handler.draw_scaled_text(f"EVR: {evr_balance:.2f}", 0, 80, scale=2)
     #text_handler.draw_scaled_text(f"{evr_balance:.2f}", 140, y_offset, scale=2)
 
     # Add updated timestamp
@@ -672,6 +823,28 @@ def main():
     # Optional: Draw LOLLIPOP bitmap if present
     if "LOLLIPOP" in assets:
         text_handler.draw_bitmap(261, 86, LOLLIPOP_BITMAP, 32, 32)
+        
+        
+            # Load previous data
+    previous_data = load_previous_data()
+    prev_satori = previous_data.get("SATORI", 0.0)
+    prev_evr = previous_data.get("EVR", 0.0)
+
+    # Calculate changes
+    satori_change = satori_balance - prev_satori
+    evr_change = evr_balance - prev_evr
+
+    # Format change as string with indicator
+    satori_change_str = f"{satori_change:.2f}" if satori_change < 0 else f"+{satori_change:.2f}"
+    evr_change_str = f"{evr_change:.2f}" if evr_change < 0 else f"+{evr_change:.2f}"
+
+    # Display the changes
+    text_handler.draw_scaled_text(f"{satori_change_str}", 0, 64, scale=1)
+    text_handler.draw_scaled_text(f"{evr_change_str}", 0, 96, scale=1)
+
+
+
+
 
     disconnect_wifi()  # Disconnect Wi-Fi to save power
     epd.display(epd.buffer)
