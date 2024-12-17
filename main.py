@@ -30,6 +30,7 @@ import socket
 import time
 import struct
 import machine
+import ujson
 
 # Wi-Fi credentials
 SSID = "YOUR-WIFI-SSID"
@@ -46,6 +47,7 @@ WALLET_ADDRESSES = [
     "EXfMF1w2x65eZtK3jKHuAa28EBngqW8RnC",
     "Ec1pNjD7CxDjQGcjyD3TZ4ayZ3thRkJqoM"
 ]
+
 
 # Pin definitions
 RST_PIN = 12
@@ -127,14 +129,6 @@ LOLLIPOP_BITMAP = [
     0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 32
 ]
 
-
-
-
-
-
-
-
-
 # LUT for full update
 WS_20_30 = [                                    
     0x80,    0x66,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x40,    0x0,    0x0,    0x0,
@@ -157,7 +151,6 @@ WS_20_30 = [
     0x44,    0x44,    0x44,    0x44,    0x44,    0x44,    0x0,    0x0,    0x0,            
     0x22,    0x17,    0x41,    0x0,    0x32,    0x36
 ]
-
 
 WF_PARTIAL_2IN9 = [
     0x0,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
@@ -567,6 +560,46 @@ def set_time():
     # Set RTC
     tm = time.gmtime(timestamp)
     machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
+    
+def disconnect_wifi():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(False)  # Turn off Wi-Fi
+    wlan.disconnect()
+    print("Wi-Fi disconnected.")
+
+def fetch_neurons_data():
+    """
+    Fetches the Neurons data from the SatoriNet report URL.
+    Returns the Competing Neurons count or None if the request fails.
+    """
+    try:
+        url = "https://satorinet.io/reports/daily/stats/predictors/latest"
+        headers = {'Accept': 'application/json'}
+        response = urequests.get(url, headers=headers)
+        
+        # Debug: Print raw response text
+        raw_content = response.text
+        print("Raw response content:", raw_content)
+        
+        # Replace NaN with null to make the JSON valid
+        valid_json_content = raw_content.replace("NaN", "null")
+        
+        # Parse cleaned JSON content using ujson
+        data = ujson.loads(valid_json_content)
+        neurons = int(data.get("Competing Neurons", 0))  # Fetch Competing Neurons
+        return neurons
+    except Exception as e:
+        print("Error fetching neurons data:", e)
+        return None
+    finally:
+        try:
+            response.close()  # Ensure the connection is closed
+        except:
+            pass
+
+
+
+
 
 def main():
     connect_wifi()
@@ -576,7 +609,14 @@ def main():
     if not data:
         print("Failed to fetch data. Exiting.")
         return
-
+    
+    # Fetch Neurons data
+    neurons = fetch_neurons_data()
+    if neurons is None:
+        neurons = "N/A"
+    else:
+        neurons = f"{neurons:,}"  # Format number with commas
+        
     # Parse the aggregated data
     evr_balance = data.get("balance", 0.0)
     assets = data.get("assets", {})
@@ -627,17 +667,20 @@ def main():
         (current_time[3], current_time[4], current_time[2], current_time[1], current_time[0] % 100), 0, 112, scale=1)
 
     # Draw version information ##PLACEHOLDERS##
-    text_handler.draw_scaled_text("VER: v0.3.1 NEURONS: 19998 STAKE: 10", 0, 120 , scale=1)
+    text_handler.draw_scaled_text(f"VER: v0.3.1 NEURONS: {neurons} STAKE: 10", 0, 120 , scale=1)
 
     # Optional: Draw LOLLIPOP bitmap if present
     if "LOLLIPOP" in assets:
         text_handler.draw_bitmap(261, 86, LOLLIPOP_BITMAP, 32, 32)
 
+    disconnect_wifi()  # Disconnect Wi-Fi to save power
     epd.display(epd.buffer)
     epd.sleep()
 
     print("Rebooting in 60 minutes...")
+    
     time.sleep(3600)
+    
     machine.reset()
     
 if __name__ == "__main__":
