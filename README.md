@@ -19,3 +19,12 @@ png2bmparray.py
 ===============
 
 Used to create Bitmap array for loading into the screen code.
+
+
+main.py
+=======
+
+For loading onto the RPI Pico W.  Edit the Wifi details, wallet addresses, GMT Offset & Date format at the top of the file, and use Thony to upload the file to the microcontroler.
+
+
+Detailed instructions coming soon.
