@@ -5,7 +5,7 @@
 
 
 
-The Hardware (Screen comes terminals soldered, you can buy un soldered or pre-soldered RPI Pico versions.  Make sure to get a W (wireless) version.  RPI Pico 2 W should also work, but I do not have one to test.
+The Hardware (Screen comes terminals soldered, you can buy un soldered or pre-soldered RPI Pico versions.)  Make sure to get a W (wireless) version.  RPI Pico 2 W should also work, but I do not have one to test.
 
 Screen:  https://www.waveshare.com/pico-epaper-2.9.htm
 RPI Pico: https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104
