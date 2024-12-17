@@ -65,10 +65,5 @@ Out of the box, the RPI Pico W may not have the required **full firmware** for M
 2. [Getting Started with Pico - Step 3](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/3)
 
 ---
-## Notes
-- Ensure you have a stable WiFi connection for retrieving wallet balances.
-- Follow the hardware installation guidelines carefully to avoid issues with connectivity or display.
-
----
 ### License
 MIT
