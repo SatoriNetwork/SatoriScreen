@@ -1,6 +1,7 @@
 # SatoriScreen
 
-![image](https://github.com/user-attachments/assets/a2d10989-8b8e-4036-b0c5-07a056c22910)![image](https://github.com/user-attachments/assets/c2e3d0d1-eb83-43e5-8e8e-9089075c7d64)
+![image](https://github.com/user-attachments/assets/a2d10989-8b8e-4036-b0c5-07a056c22910)![image](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
+
 
 
 
