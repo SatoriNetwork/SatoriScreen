@@ -13,3 +13,9 @@ RPI Pico: https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104
 The software is WIP, but currently connects to WiFi and gets SATORI and EVR balance from multiple addresses, as well as getting the time via NTP & displays on the screen.  
 
 It needs aditional API's developed to display the version/neuron count/current stake
+
+
+png2bmparray.py
+===============
+
+Used to create Bitmap array for loading into the screen code.
