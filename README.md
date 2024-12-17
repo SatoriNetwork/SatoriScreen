@@ -1,10 +1,8 @@
 # SatoriScreen
 
-![image](https://github.com/user-attachments/assets/2dd0aa0c-9475-4713-9e83-1dfcc2ac9d4a)
+![image](https://github.com/user-attachments/assets/2dd0aa0c-9475-4713-9e83-1dfcc2ac9d4a)  ![image](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
 
-![image](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
 
-![image](https://github.com/user-attachments/assets/a2d10989-8b8e-4036-b0c5-07a056c22910)
 ## Hardware Requirements
 The Waveshare screen comes with soldered terminals; you can purchase unsoldered or pre-soldered RPI Pico versions. **Make sure to use the RPI Pico W (wireless version).** The RPI Pico 2 W should also work, though it has not been tested.
 
