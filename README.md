@@ -6,8 +6,14 @@
 ## Hardware Requirements
 The Waveshare screen comes with soldered terminals; you can purchase unsoldered or pre-soldered RPI Pico versions. **Make sure to use the RPI Pico W (wireless version).** The RPI Pico 2 W should also work, though it has not been tested.
 
+International
 - **Screen:** [Waveshare Pico ePaper 2.9](https://www.waveshare.com/pico-epaper-2.9.htm)
-- **RPI Pico W:** [Raspberry Pi Pico W](https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104)
+- **RPI Pico WH:** [Raspberry Pi Pico W](https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104)
+
+Australia
+- **RPI Pico W:** [Raspberry Pi Pico WH](https://core-electronics.com.au/raspberry-pi-pico-wh.html)
+- **Screen:** [Waveshare Pico ePaper 2.9](https://core-electronics.com.au/waveshare-2-9inch-e-paper-module-for-raspberry-pi-pico-296x128-black-white.html)
+
 
 ---
 ## Software Overview
