@@ -1,30 +1,74 @@
 # SatoriScreen
 
-![image](https://github.com/user-attachments/assets/a2d10989-8b8e-4036-b0c5-07a056c22910)![image](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
+![image](https://github.com/user-attachments/assets/a2d10989-8b8e-4036-b0c5-07a056c22910)
+![image](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
 
+## Hardware Requirements
+The Waveshare screen comes with soldered terminals; you can purchase unsoldered or pre-soldered RPI Pico versions. **Make sure to use the RPI Pico W (wireless version).** The RPI Pico 2 W should also work, though it has not been tested.
 
+- **Screen:** [Waveshare Pico ePaper 2.9](https://www.waveshare.com/pico-epaper-2.9.htm)
+- **RPI Pico W:** [Raspberry Pi Pico W](https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104)
 
+---
+## Software Overview
+The software is currently a **Work in Progress (WIP)**. The following features are implemented:
 
-The Hardware (Screen comes terminals soldered, you can buy un soldered or pre-soldered RPI Pico versions.)  Make sure to get a W (wireless) version.  RPI Pico 2 W should also work, but I do not have one to test.
+- Connects to WiFi.
+- Retrieves **SATORI** and **EVR** balances from multiple wallet addresses.
+- Fetches current time via **NTP**.
+- Displays balance and time on the ePaper screen.
 
-Screen:  https://www.waveshare.com/pico-epaper-2.9.htm
-RPI Pico: https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104
+### Upcoming Features
+Additional APIs are needed to display:
+- Software version.
+- Neuron count.
+- Current stake.
 
-The software is WIP, but currently connects to WiFi and gets SATORI and EVR balance from multiple addresses, as well as getting the time via NTP & displays on the screen.  
+---
+## Scripts
 
-It needs aditional API's developed to display the version/neuron count/current stake
+### `png2bmparray.py`
+Used to create bitmap arrays for loading into the screen code.
 
+### `main.py`
+Main script to be loaded onto the RPI Pico W.
 
-png2bmparray.py
-===============
+---
+## Installation & Setup
 
-Used to create Bitmap array for loading into the screen code.
+### Installing or Updating the Code on the RPI Pico W
+1. Open **Thonny** (a Python IDE).
+2. Paste the code from `main.py` into the editor.
+    - If an existing file opens, click **New**.
+3. Edit the following variables at the top of the file:
+    - **WiFi details** (SSID and password).
+    - **Wallet addresses**.
+    - **GMT Offset**.
+    - **Date format**.
+4. Go to **File > Save As**.
+5. Select **Raspberry Pi Pico** as the destination.
+6. Save the file as `main.py`.
 
+---
+## Hardware Installation
+The RPI Pico plugs directly into the Waveshare screen:
+- The **USB port** on the Pico must align with the same side as the **ribbon cable**.
+- The text on both the Pico and the screen should face **upwards**.
 
-main.py
-=======
+Refer to Image 2 above for clarity.
 
-For loading onto the RPI Pico W.  Edit the Wifi details, wallet addresses, GMT Offset & Date format at the top of the file, and use Thony to upload the file to the microcontroler.
+---
+## Loading Firmware on a New RPI Pico W
+Out of the box, the RPI Pico W may not have the required **full firmware** for MicroPython. Follow these steps to load it:
 
+1. [Getting Started with Pico - Step 2](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/2)
+2. [Getting Started with Pico - Step 3](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/3)
 
-Detailed instructions coming soon.
+---
+## Notes
+- Ensure you have a stable WiFi connection for retrieving wallet balances.
+- Follow the hardware installation guidelines carefully to avoid issues with connectivity or display.
+
+---
+### License
+MIT
