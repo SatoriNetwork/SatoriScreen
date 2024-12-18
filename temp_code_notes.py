@@ -1,3 +1,6 @@
+# Notes for things I am adding in.
+# ================================
+
 # Read the onboard button, note: temporarily disables access to the external flash memory, temporarily disables interrupts and the other core to prevent them from trying to execute code from flash
 # This cannot be run all the time.  Possibly flash led and pause for a couple of seconds on boot, and if it is pressed perform the update (which can call a seperate file entirely)
 #import my_app
