@@ -47,31 +47,63 @@ WIFI_SSID = None
 WIFI_PASSWORD = None
 GMT_OFFSET = None
 DATE_FORMAT = None
+AUTO_UPDATE = None
 ADDRESSES = []
 
 SETTINGS_FILE = "settings.txt"
 
+def validate_gmt_offset(value):
+    try:
+        offset = int(value)
+        if -12 <= offset <= 14:
+            return offset
+        else:
+            print("Error: GMT Offset must be between -12 and +14.")
+    except ValueError:
+        print("Error: GMT Offset must be an integer.")
+    return None
+
+def validate_date_format(value):
+    valid_formats = {"dmy", "ymd", "mdy"}
+    if value in valid_formats:
+        return value
+    else:
+        print("Error: Date format must be one of 'dmy', 'ymd', or 'mdy'.")
+    return None
+
+def validate_auto_update(value):
+    if value.lower() in {"true", "false"}:
+        return value.lower() == "true"
+    else:
+        print("Error: Auto Update must be 'True' or 'False'.")
+    return None
+    
 def load_or_create_settings():
-    global WIFI_SSID, WIFI_PASSWORD, GMT_OFFSET, DATE_FORMAT, ADDRESSES
+    global WIFI_SSID, WIFI_PASSWORD, GMT_OFFSET, DATE_FORMAT, AUTO_UPDATE, ADDRESSES
 
     if SETTINGS_FILE in os.listdir():
         print("Settings file found. Loading...")
         with open(SETTINGS_FILE, "r") as file:
             lines = file.readlines()
-            if len(lines) < 4:
-                raise ValueError("Settings file is malformed. It must have at least 4 lines.")
+            if len(lines) < 5:
+                raise ValueError("Settings file is malformed. It must have at least 5 lines.")
 
             WIFI_SSID = lines[0].strip()
             WIFI_PASSWORD = lines[1].strip()
-            GMT_OFFSET = int(lines[2].strip())
-            DATE_FORMAT = lines[3].strip()
-            ADDRESSES = [line.strip() for line in lines[4:]]
+            GMT_OFFSET = validate_gmt_offset(lines[2].strip())
+            DATE_FORMAT = validate_date_format(lines[3].strip().lower())
+            AUTO_UPDATE = validate_auto_update(lines[4].strip().lower())
+            ADDRESSES = [line.strip() for line in lines[5:]]
+
+            if GMT_OFFSET is None or DATE_FORMAT is None or AUTO_UPDATE is None:
+                raise ValueError("Settings file contains invalid values.")
 
             print("Settings loaded successfully:")
             print(f"WIFI_SSID: {WIFI_SSID}")
             print(f"WIFI_PASSWORD: {WIFI_PASSWORD}")
             print(f"GMT_OFFSET: {GMT_OFFSET}")
             print(f"DATE_FORMAT: {DATE_FORMAT}")
+            print(f"AUTO_UPDATE: {AUTO_UPDATE}")
             print(f"ADDRESSES: {ADDRESSES}")
     else:
         print("Settings file not found. Please provide the settings:")
@@ -79,8 +111,21 @@ def load_or_create_settings():
         # Prompt user for input
         WIFI_SSID = input("Enter WiFi SSID: ").strip()
         WIFI_PASSWORD = input("Enter WiFi Password: ").strip()
-        GMT_OFFSET = int(input("Enter GMT Offset (e.g., +10, -6): ").strip())
-        DATE_FORMAT = input("Enter Date Format (dmy, ymd, mdy): ").strip().lower()
+        
+        while True:
+            GMT_OFFSET = validate_gmt_offset(input("Enter GMT Offset (e.g., +10, -6): ").strip())
+            if GMT_OFFSET is not None:
+                break
+
+        while True:
+            AUTO_UPDATE = validate_auto_update(input("Auto Update (True/False): ").strip())
+            if AUTO_UPDATE is not None:
+                break
+
+        while True:
+            DATE_FORMAT = validate_date_format(input("Enter Date Format (dmy, ymd, mdy): ").strip().lower())
+            if DATE_FORMAT is not None:
+                break
 
         ADDRESSES = []
         print("Enter addresses (one per line). Leave blank to finish:")
@@ -90,6 +135,21 @@ def load_or_create_settings():
                 break
             ADDRESSES.append(address)
 
+        # Print settings and ask for confirmation
+        print("\nSettings to be saved:")
+        print(f"WIFI_SSID: {WIFI_SSID}")
+        print(f"WIFI_PASSWORD: {WIFI_PASSWORD}")
+        print(f"GMT_OFFSET: {GMT_OFFSET}")
+        print(f"DATE_FORMAT: {DATE_FORMAT}")
+        print(f"AUTO_UPDATE: {AUTO_UPDATE}")
+        print(f"ADDRESSES: {ADDRESSES}")
+
+        confirm = input("\nConfirm save? (yes/no): ").strip().lower()
+        if confirm != "yes":
+            print("Settings not saved. Please restart the program to re-enter settings.")
+            machine.reset()
+            
+
         # Save settings to file
         print("Saving settings to file...")
         with open(SETTINGS_FILE, "w") as file:
@@ -97,13 +157,10 @@ def load_or_create_settings():
             file.write(f"{WIFI_PASSWORD}\n")
             file.write(f"{GMT_OFFSET}\n")
             file.write(f"{DATE_FORMAT}\n")
+            file.write(f"{'true' if AUTO_UPDATE else 'false'}\n")
             for address in ADDRESSES:
                 file.write(f"{address}\n")
 
-        print("Settings saved successfully.")          
-            print(f"Library '{lib}' is already installed.")
-        except ImportError:
-            print(f"Library '{lib}' not found. Downloading...")
-            download_library(lib, url)
+        print("Settings saved successfully.")
 
 
