@@ -38,6 +38,17 @@ def check_and_download_libraries():
     for lib, url in REQUIRED_LIBRARIES.items():
         try:
             __import__(lib)  # Try importing the library
+            print(f"Library '{lib}' is already installed.")
+        except ImportError:
+            print(f"Library '{lib}' not found. Downloading...")
+            download_library(lib, url)
+            try:
+                # Attempt to import the library after downloading
+                __import__(lib)
+                print(f"Library '{lib}' imported successfully after downloading.")
+            except ImportError:
+                print(f"Failed to import '{lib}' even after downloading.")
+
 
 
 
@@ -96,7 +107,8 @@ def load_or_create_settings():
             ADDRESSES = [line.strip() for line in lines[5:]]
 
             if GMT_OFFSET is None or DATE_FORMAT is None or AUTO_UPDATE is None:
-                raise ValueError("Settings file contains invalid values.")
+                handle_invalid_settings()
+
 
             print("Settings loaded successfully:")
             print(f"WIFI_SSID: {WIFI_SSID}")
@@ -163,4 +175,21 @@ def load_or_create_settings():
 
         print("Settings saved successfully.")
 
+def handle_invalid_settings():
+    print("Error: Settings file contains invalid values. Deleting the file and rebooting...")
+    try:
+        # Delete the settings file
+        if SETTINGS_FILE in os.listdir():
+            os.remove(SETTINGS_FILE)
+            print("Settings file deleted.")
+        else:
+            print("Settings file does not exist, nothing to delete.")
 
+        # Reboot the system
+        print("Rebooting the system...")
+        machine.reset()
+    except Exception as e:
+        print(f"Failed to delete file or reboot: {e}")
+        # In case of failure, halt the execution
+        while True:
+            pass
