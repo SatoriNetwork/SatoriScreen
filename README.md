@@ -12,7 +12,7 @@ International
 
 Australia
 - **Screen:** [Waveshare Pico ePaper 2.9](https://core-electronics.com.au/waveshare-2-9inch-e-paper-module-for-raspberry-pi-pico-296x128-black-white.html)
-- **RPI Pico W:** [Raspberry Pi Pico WH](https://core-electronics.com.au/raspberry-pi-pico-wh.html)
+- **RPI Pico WH:** [Raspberry Pi Pico WH](https://core-electronics.com.au/raspberry-pi-pico-wh.html)
 
 
 
