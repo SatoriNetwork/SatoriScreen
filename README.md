@@ -23,13 +23,18 @@ The software is currently a **Work in Progress (WIP)**. The following features a
 - Connects to WiFi.
 - Retrieves **SATORI** and **EVR** balances from multiple wallet addresses.
 - Fetches current time via **NTP**.
-- Displays balance and time on the ePaper screen.
+- Displays: Satori & EVR balance, update time, Neuron count and Satori Price.
 
 ### Upcoming Features
 Additional APIs are needed to display:
 - Software version.
-- Neuron count.
 - Current stake.
+- Watchdog
+- Better Fonts
+- Onboard LED Control (For status not shown on the screen, e.g. WiFi, Errors, updating)
+- Screen refresh protection (Ensure screen is not refreshed more often than the manufacturer recommends)
+- Option for device to upgrade direct from github
+
 
 ---
 ## Scripts
