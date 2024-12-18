@@ -29,10 +29,12 @@ The software is currently a **Work in Progress (WIP)**. The following features a
 Additional APIs are needed to display:
 - Software version.
 - Current stake.
+In Testing
 - Watchdog
-- Better Fonts
 - Onboard LED Control (For status not shown on the screen, e.g. WiFi, Errors, updating)
 - Screen refresh protection (Ensure screen is not refreshed more often than the manufacturer recommends)
+Coming Soon
+- Better Fonts
 - Option for device to upgrade direct from github
 
 
