@@ -6,7 +6,7 @@
 #import my_app
 #my_app.main()
 
-#Main app will need wifi & downloader for libraries.
+# Main app will need wifi & downloader for libraries.  Possibly an installer, that collects the settings.txt & downloads the latest versions
 
 import rp2
 rp2.bootsel_button()
