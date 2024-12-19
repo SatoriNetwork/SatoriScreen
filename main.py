@@ -222,7 +222,7 @@ class Settings:
                 print(f"📅  DATE_FORMAT: {self.DATE_FORMAT}")
                 print(f"📍  ADDRESSES: {self.ADDRESSES}")
                 print("-----------------------------------------")
-                #time.sleep(1)
+                time.sleep(1)
                 
         else:
             print("[Warning] Settings file not found. Please provide the settings:")
