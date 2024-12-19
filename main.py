@@ -81,6 +81,7 @@ REQUIRED_LIBRARIES = {
     "ntp_client": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/ntp_client.py",
     "historical_data": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/historical_data.py",
     "display_service": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/display_service.py",
+    "main": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/main.py",
 }
 
 def download_file(url, filename):
