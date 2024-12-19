@@ -23,7 +23,7 @@ LED Status Codes
     Author:        JC
     GitHub:        https://github.com/JohnConnorNPC
     X / Discord :  @jc0839
-    Discord:  @jc0839
+    
 
 License: MIT
 Version: 1.1.2
