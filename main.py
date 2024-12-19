@@ -23,10 +23,10 @@ LED Status Codes
     Author:        JC
     GitHub:        https://github.com/JohnConnorNPC
     X / Discord :  @jc0839
-    
+   
 
 License: MIT
-Version: 1.1.2
+
 """
 
 # main.py
@@ -48,7 +48,7 @@ try:
     from scaled_text import ScaledText
     from epd_2in9_landscape import EPD_2in9_Landscape
     from ntp_client import NTPClient
-    from historical_data import HistoricalData
+    
     from display_service import DisplayService
     import arial10
     import arial_50
@@ -79,7 +79,7 @@ REQUIRED_LIBRARIES = {
     "scaled_text": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/scaled_text.py",
     "epd_2in9_landscape": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/epd_2in9_landscape.py",
     "ntp_client": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/ntp_client.py",
-    "historical_data": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/historical_data.py",
+    
     "display_service": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/display_service.py",
     "main": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/main.py",
 }
@@ -92,8 +92,8 @@ def download_file(url, filename):
         if response.status_code == 200:
             with open(filename, 'w') as file:
                 file.write(response.text)
-                response=None
-                gc.collect()
+            response=None
+            gc.collect()
             print(f"Downloaded and saved {filename}.")
         else:
             print(f"Failed to download {filename}: {response.status_code}")
@@ -314,8 +314,11 @@ class GitHubUpdater:
                 temp_filename = f"{lib_name}.tmp"
                 with open(temp_filename, "wb") as f:
                     f.write(response.content)
+                response=None
+                gc.collect()
                 os.rename(temp_filename, f"{lib_name}.py")
                 print(f"Library '{lib_name}' downloaded successfully.")
+                time.sleep(1)
             else:
                 print(f"Failed to download '{lib_name}'. HTTP Status Code: {response.status_code} or no content received.")
             gc.collect()
@@ -421,7 +424,7 @@ if __name__ == "__main__":
         
         # Initialize components
         watchdog = Watchdog()
-        historical_data = HistoricalData()        
+        
         display_service = DisplayService(EPD_WIDTH, EPD_HEIGHT)
         watchdog.feed()
         
@@ -437,43 +440,48 @@ if __name__ == "__main__":
             
             if can_update_screen():
                 # Fetch all data using the display service
+                
                 balance_data = display_service.fetch_all_address_info(ADDRESSES, watchdog)
+                
+                gc.collect()
                 neurons_data = display_service.fetch_neurons_data(watchdog)
+                
+                gc.collect()
                 satori_price = display_service.get_satori_price(watchdog)
                 
-                # Update historical data and get statistics
-                if historical_data.update_data(balance_data, neurons_data, satori_price):
-                    stats = historical_data.get_statistics()
+                gc.collect()
+                
+                
+                
+                # Initialize display
+                watchdog.feed()
+                epd = EPD_2in9_Landscape()
+                text_handler = ScaledText(epd, EPD_WIDTH)
                     
-                    # Initialize display
-                    watchdog.feed()
-                    epd = EPD_2in9_Landscape()
-                    text_handler = ScaledText(epd, EPD_WIDTH)
+                gc.collect()
                     
-                    gc.collect()
+                # Update display using the display service
+                display_service.update_display(epd, text_handler, balance_data, neurons_data, satori_price, watchdog, None)
+                   
+                watchdog.feed()
+                epd.display(epd.buffer)
+                epd.sleep()
+                watchdog.feed()
                     
-                    # Update display using the display service
-                    display_service.update_display(epd, text_handler, balance_data, neurons_data, satori_price, watchdog, stats)
-                    
-                    watchdog.feed()
-                    epd.display(epd.buffer)
-                    epd.sleep()
-                    watchdog.feed()
-                    
-                    # Save update time
-                    save_last_update_time()
-                    SECONDS_IN_HOUR = 3600
-                    counter = 0
+                # Save update time
+                save_last_update_time()
+                SECONDS_IN_HOUR = 3600
+                counter = 0
 
-                    # Blink LED to indicate successful update
-                    while True:
-                        time.sleep(1)
-                        counter += 1
-                        led.turn_on() if led_on else led.turn_off()
-                        led_on = not led_on
-                        watchdog.feed()
-                        if counter >= SECONDS_IN_HOUR:
-                            machine.reset()
+                # Blink LED to indicate successful update
+                while True:
+                    time.sleep(1)
+                    counter += 1
+                    led.turn_on() if led_on else led.turn_off()
+                    led_on = not led_on
+                    watchdog.feed()
+                    if counter >= SECONDS_IN_HOUR:
+                        machine.reset()
                         
             
             # Wait before next check
