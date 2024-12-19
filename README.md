@@ -1,86 +1,70 @@
 # SatoriScreen
 
-![image](https://github.com/user-attachments/assets/2dd0aa0c-9475-4713-9e83-1dfcc2ac9d4a)  ![image](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
+A MicroPython-based wallet monitor for SATORI and EVRMORE that displays balance information on a 2.9" ePaper screen.
 
+![SatoriScreen Display](https://github.com/user-attachments/assets/2dd0aa0c-9475-4713-9e83-1dfcc2ac9d4a)
+![Hardware Setup](https://github.com/user-attachments/assets/a9ccd19b-12fa-40ab-a175-4300ae388b45)
+
+## Features
+
+### Current Implementation
+- WiFi connectivity
+- Multiple wallet address monitoring (SATORI & EVR balances)
+- NTP time synchronization
+- Display of:
+  - Satori & EVR balances
+  - Update time
+  - Neuron count
+  - Satori Price
+  - Watchdog implementation
+  - Software version display
+  - Current stake information
+- Onboard LED status indicators (WiFi, Updates, Operation)
+- Screen refresh protection system
+- Direct GitHub upgrade/install capability
 
 ## Hardware Requirements
-The Waveshare screen comes with soldered terminals; you can purchase unsoldered or pre-soldered RPI Pico versions. **Make sure to use the RPI Pico W (wireless version).** The RPI Pico 2 W should also work, though it has not been tested.
 
-International
-- **Screen:** [Waveshare Pico ePaper 2.9](https://www.waveshare.com/pico-epaper-2.9.htm)
-- **RPI Pico WH:** [Raspberry Pi Pico W](https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104)
+**Important:** Use the RPI Pico W (wireless version). RPI Pico 2 W should be compatible but is untested.
 
-Australia
-- **Screen:** [Waveshare Pico ePaper 2.9](https://core-electronics.com.au/waveshare-2-9inch-e-paper-module-for-raspberry-pi-pico-296x128-black-white.html)
-- **RPI Pico WH:** [Raspberry Pi Pico WH](https://core-electronics.com.au/raspberry-pi-pico-wh.html)
+### International Suppliers
+- **Display:** [Waveshare Pico ePaper 2.9](https://www.waveshare.com/pico-epaper-2.9.htm)
+- **Microcontroller:** [Raspberry Pi Pico WH](https://www.waveshare.com/raspberry-pi-pico-w.htm?sku=23104)
 
+### Australian Suppliers
+- **Display:** [Waveshare Pico ePaper 2.9](https://core-electronics.com.au/waveshare-2-9inch-e-paper-module-for-raspberry-pi-pico-296x128-black-white.html)
+- **Microcontroller:** [Raspberry Pi Pico WH](https://core-electronics.com.au/raspberry-pi-pico-wh.html)
 
+## Installation Guide
 
----
-## Software Overview
-The software is currently a **Work in Progress (WIP)**. The following features are implemented:
+### Initial Setup
+1. If using a new RPI Pico W, install the full MicroPython firmware:
+   - Follow [Getting Started with Pico - Step 2](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/2)
+   - Continue with [Getting Started with Pico - Step 3](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/3)
 
-- Connects to WiFi.
-- Retrieves **SATORI** and **EVR** balances from multiple wallet addresses.
-- Fetches current time via **NTP**.
-- Displays: Satori & EVR balance, update time, Neuron count and Satori Price.
+### Software Installation
+1. Launch Thonny IDE
+2. Create a new file or clear existing content
+3. Copy contents from `main.py` into the editor
+4. Save as `main.py` on the Raspberry Pi Pico
+5. Run the script:
+   - Automatic: Click play in Thonny and follow prompts to download required libraries
+   - Manual: Create individual library files listed in REQUIRED_LIBRARIES
 
-### Upcoming Features
-Additional APIs are needed to display:
-- Software version.
-- Current stake.
+### Hardware Assembly
+Connect the RPI Pico to the Waveshare screen:
+- Align USB port with ribbon cable side
+- Ensure both components face upward (text visible)
+- Reference Image 2 for correct orientation
+- Follow Manufacturer Instructions
 
-  
-In Testing
-- Watchdog
-- Onboard LED Control (For status not shown on the screen, e.g. WiFi, Errors, updating)
-- Screen refresh protection (Ensure screen is not refreshed more often than the manufacturer recommends)
+## Utility Scripts
 
-Coming Soon
-- Better Fonts
-- Option for device to upgrade direct from github
+### png2bmparray.py
+Converts PNG images to bitmap arrays for display compatibility
 
+### main.py
+Primary script containing core functionality
 
----
-## Scripts
-
-### `png2bmparray.py`
-Used to create bitmap arrays for loading into the screen code.
-
-### `main.py`
-Main script to be loaded onto the RPI Pico W.
-
----
-## Installation & Setup
-
-### Installing or Updating the Code on the RPI Pico W
-1. Open **Thonny** (a Python IDE).
-2. Paste the code from `main.py` into the editor.
-    - If an existing file opens, click **New**.
-3. Edit the following variables at the top of the file:
-    - **WiFi details** (SSID and password).
-    - **Wallet addresses**.
-    - **GMT Offset**.
-    - **Date format**.
-4. Go to **File > Save As**.
-5. Select **Raspberry Pi Pico** as the destination.
-6. Save the file as `main.py`.
-
----
-## Hardware Installation
-The RPI Pico plugs directly into the Waveshare screen:
-- The **USB port** on the Pico must align with the same side as the **ribbon cable**.
-- The text on both the Pico and the screen should face **upwards**.
-
-Refer to Image 2 above for clarity.
-
----
-## Loading Firmware on a New RPI Pico W
-Out of the box, the RPI Pico W may not have the required **full firmware** for MicroPython. Follow these steps to load it:
-
-1. [Getting Started with Pico - Step 2](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/2)
-2. [Getting Started with Pico - Step 3](https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/3)
-
----
-### License
+## License
 MIT
