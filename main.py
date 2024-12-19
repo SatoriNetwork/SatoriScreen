@@ -62,7 +62,7 @@ except ImportError:
 # Constants
 EPD_WIDTH = 128
 EPD_HEIGHT = 296
-UPDATE_INTERVAL = 300  # Screen update interval in seconds (5 minutes)
+UPDATE_INTERVAL = 300  # Minimum Screen update interval in seconds (Do not go below manufacturer spec)
 LAST_UPDATE_FILE = "last_update.txt"
 SETTINGS_FILE = "settings.txt"
 
@@ -88,9 +88,12 @@ def download_file(url, filename):
     try:
         print(f"Downloading {filename} from {url}...")
         response = urequests.get(url)
+        gc.collect()
         if response.status_code == 200:
             with open(filename, 'w') as file:
                 file.write(response.text)
+                response=None
+                gc.collect()
             print(f"Downloaded and saved {filename}.")
         else:
             print(f"Failed to download {filename}: {response.status_code}")
@@ -360,10 +363,13 @@ def can_update_screen():
     if last_update is None:
         return True
         
-    time_since_update = time.time() - last_update
-    print(f"Time since last update: {time_since_update:.1f}s")
+    current_time = int(time.time())
+    time_since_update = current_time - int(last_update)
+    print(f"Current time: {current_time}")
+    print(f"Time to wait: {UPDATE_INTERVAL - time_since_update:.1f}s before allowed to update screen")
+    
+    
     return time_since_update >= UPDATE_INTERVAL
-
 if __name__ == "__main__":
     # Initialize components
     settings = Settings()
