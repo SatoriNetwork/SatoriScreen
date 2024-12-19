@@ -16,9 +16,9 @@ A MicroPython-based wallet monitor for SATORI and EVRMORE that displays balance 
   - Update time
   - Neuron count
   - Satori Price
-  - Watchdog implementation
   - Software version display
   - Current stake information
+- Watchdog implementation
 - Onboard LED status indicators (WiFi, Updates, Operation)
 - Screen refresh protection system
 - Direct GitHub upgrade/install capability
