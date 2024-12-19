@@ -1,860 +1,482 @@
-################################################################################
-#  micropython                                                                 #
-#                                                                              #
-#  Script: SATORI & EVRMORE Wallet Monitor                                     #
-#  Description: Connects to wallet APIs to retrieve EVR balance, specific      #
-#               asset balances (e.g., SATORI, LOLLIPOP), and displays the data #
-#               on a 2.9" ePaper display. Includes price updates and visuals.  #
-#                                                                              #
-#                                                                              #
-#  Features:                                                                   #
-#      - Retrieves EVR balance and selected asset balances.                    #
-#      - Fetches live price data for SATORI.                                   #
-#      - Displays data on an ePaper display with custom visuals (bitmaps).     #
-#      - Updates regularly (once per hour) and fetches accurate NTP time.      #
-#      - Includes flexible text scaling and bitmap drawing tools.              #
-#                                                                              #
-#  Author: https://github.com/JohnConnorNPC  X: @jc0839 Discord: @jc0839       #
-#  License: MIT                                                                #
-#  Version: 0.1.1                                                             #
-#                                                                              #
-################################################################################
 
+"""
+MicroPython SATORI & EVRMORE Wallet Monitor
+=========================================
 
-import network
-import urequests
-from machine import Pin, SPI
-import framebuf
-import utime
-import socket
+A MicroPython script that monitors wallet balances and displays data on a 2.9" ePaper display.
+Fetches EVR balance, specific asset balances (SATORI, LOLLIPOP), and displays with custom visuals.
+
+Features
+--------
+- Retrieves EVR balance and selected asset balances
+- Fetches live SATORI price data
+- Displays data on ePaper with custom visuals (bitmaps)
+- Hourly updates with accurate NTP time
+- Flexible text scaling and bitmap drawing tools
+
+LED Status Codes
+---------------
+- Very Fast Blink: Ready for update (press bootsel button) first 5 sec after boot
+- 0.5s on/off: Waiting to update screen (refresh attempted too early)
+- 1.0s on/off: Normal operation - waiting for next screen update
+
+    Author:        JC
+    GitHub:        https://github.com/JohnConnorNPC
+    X / Discord :  @jc0839
+    Discord:  @jc0839
+
+License: MIT
+Version: 1.1.2
+"""
+
+# main.py
+
 import time
-import struct
+import rp2
+import network
+import utime
+import urequests
 import machine
-import ujson
 import os
+import gc
 
-# Wi-Fi credentials
-SSID = "YOUR-WIFI-SSID"
-PASSWORD = "YOUR-WIFI-PASSWORD"
+NEEDS_UPDATE = False
+try:
+    # Project-specific imports
+    from bitmaps import SATORI_BITMAP, LOLLIPOP_BITMAP, SATORI_LOGO
+    from watchdog import Watchdog
+    from scaled_text import ScaledText
+    from epd_2in9_landscape import EPD_2in9_Landscape
+    from ntp_client import NTPClient
+    from historical_data import HistoricalData
+    from display_service import DisplayService
+    import arial10
+    import arial_50
+    import courier20
+    import font10
+    import font6
+    import freesans20
+except ImportError:
+    NEEDS_UPDATE = True
 
-TIMEZONE_GMT_OFFSET=10
-DATE_FORMAT="AU"
-#DATE_FORMAT="US"
-
-SHOW_DAILY_CHANGE=True #NOT IMPLIMENTED YET
-
-WALLET_ADDRESSES = [
-    "EXJxFagCoEyfF4E3v5xjXShcpyvdQgFP4C",
-    "EXfMF1w2x65eZtK3jKHuAa28EBngqW8RnC",
-    "Ec1pNjD7CxDjQGcjyD3TZ4ayZ3thRkJqoM"
-]
-
-
-STORAGE_FILE = "data.json"
-
-
-# Pin definitions
-RST_PIN = 12
-DC_PIN = 8
-CS_PIN = 9
-BUSY_PIN = 13
-
-# Display resolution
+# Constants
 EPD_WIDTH = 128
 EPD_HEIGHT = 296
+UPDATE_INTERVAL = 300  # Screen update interval in seconds (5 minutes)
+LAST_UPDATE_FILE = "last_update.txt"
+SETTINGS_FILE = "settings.txt"
 
-SATORI_BITMAP = [
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 1
-    0b00000000, 0b00000111, 0b11000000, 0b00000000,  # Row 2
-    0b00000000, 0b00111111, 0b11111100, 0b00000000,  # Row 3
-    0b00000000, 0b11111111, 0b11111111, 0b00000000,  # Row 4
-    0b00000001, 0b11110000, 0b00000111, 0b10000000,  # Row 5
-    0b00000011, 0b11000000, 0b00000011, 0b11000000,  # Row 6
-    0b00000111, 0b00000000, 0b00000000, 0b11100000,  # Row 7
-    0b00001110, 0b00000000, 0b00000000, 0b01110000,  # Row 8
-    0b00011100, 0b00000000, 0b00000000, 0b00111000,  # Row 9
-    0b00011100, 0b00000000, 0b00000000, 0b00011000,  # Row 10
-    0b00111000, 0b00000000, 0b00000000, 0b00011100,  # Row 11
-    0b00111000, 0b00000000, 0b00000000, 0b00001101,  # Row 12
-    0b00110000, 0b00000000, 0b00000000, 0b00001100,  # Row 13
-    0b01110000, 0b00000000, 0b00000000, 0b00000110,  # Row 14
-    0b01110000, 0b00000000, 0b00000000, 0b00000110,  # Row 15
-    0b01110000, 0b00000000, 0b00000000, 0b00000110,  # Row 16
-    0b01110000, 0b00000000, 0b10000000, 0b00000110,  # Row 17
-    0b01110000, 0b00000000, 0b10000000, 0b00000110,  # Row 18
-    0b00110000, 0b00000001, 0b11000000, 0b00000110,  # Row 19
-    0b00111000, 0b00000001, 0b11000000, 0b00001100,  # Row 20
-    0b00111000, 0b00000001, 0b10000000, 0b00001101,  # Row 21
-    0b00011100, 0b00000011, 0b11100000, 0b00001000,  # Row 22
-    0b00011100, 0b00000111, 0b11110000, 0b00001000,  # Row 23
-    0b00001110, 0b00000111, 0b11110000, 0b00010000,  # Row 24
-    0b00100111, 0b00000101, 0b11110000, 0b00110100,  # Row 25
-    0b00000111, 0b11001111, 0b11111000, 0b00100000,  # Row 26
-    0b00000011, 0b11111111, 0b11111000, 0b00000000,  # Row 27
-    0b00000000, 0b11111111, 0b11111111, 0b00000000,  # Row 28
-    0b00000010, 0b00111111, 0b11111110, 0b01000000,  # Row 29
-    0b00000000, 0b00001111, 0b11111000, 0b00000000,  # Row 30
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 31
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 32
-]
+# Required libraries for GitHub updates
+REQUIRED_LIBRARIES = {
+    "arial10": "https://raw.githubusercontent.com/waveshareteam/Pico_ePaper_Code/refs/heads/main/pythonNanoGui/gui/fonts/arial10.py",
+    "arial_50": "https://raw.githubusercontent.com/waveshareteam/Pico_ePaper_Code/refs/heads/main/pythonNanoGui/gui/fonts/arial_50.py",
+    "courier20": "https://raw.githubusercontent.com/waveshareteam/Pico_ePaper_Code/refs/heads/main/pythonNanoGui/gui/fonts/courier20.py",
+    "font10": "https://raw.githubusercontent.com/waveshareteam/Pico_ePaper_Code/refs/heads/main/pythonNanoGui/gui/fonts/font10.py",
+    "font6": "https://raw.githubusercontent.com/waveshareteam/Pico_ePaper_Code/refs/heads/main/pythonNanoGui/gui/fonts/font6.py",
+    "freesans20": "https://raw.githubusercontent.com/waveshareteam/Pico_ePaper_Code/refs/heads/main/pythonNanoGui/gui/fonts/freesans20.py",
+    "bitmaps": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/bitmaps.py",
+    "watchdog": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/watchdog.py",
+    "scaled_text": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/scaled_text.py",
+    "epd_2in9_landscape": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/epd_2in9_landscape.py",
+    "ntp_client": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/ntp_client.py",
+    "historical_data": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/historical_data.py",
+    "display_service": "https://raw.githubusercontent.com/SatoriNetwork/SatoriScreen/refs/heads/main/display_service.py",
+}
 
-SATORI = [
-    0b00000011, 0b11111100, 0b00000000, 0b00000000,  # Row 1
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 2
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 3
-    0b00000000, 0b00001111, 0b11111111, 0b00000000,  # Row 4
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 5
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 6
-    0b00000000, 0b01111000, 0b00011111, 0b11111111,  # Row 7
-    0b10000000, 0b00000000, 0b00000000, 0b00000000,  # Row 8
-    0b11000000, 0b00000000, 0b00000000, 0b00000000,  # Row 9
-    0b00000000, 0b00000000, 0b01111100, 0b00111111,  # Row 10
-    0b00001111, 0b11000000, 0b00000000, 0b00000000,  # Row 11
-    0b00000000, 0b11100000, 0b00000000, 0b00000000,  # Row 12
-    0b00000000, 0b00000000, 0b00000000, 0b01111000,  # Row 13
-    0b00111100, 0b00000001, 0b10000000, 0b00000000,  # Row 14
-    0b00000000, 0b00000001, 0b11100000, 0b00000000,  # Row 15
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 16
-    0b01111000, 0b01111000, 0b00000000, 0b00000000,  # Row 17
-    0b00000000, 0b00000000, 0b00000001, 0b11100000,  # Row 18
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 19
-    0b00000000, 0b00000000, 0b01111000, 0b00000000,  # Row 20
-    0b00000000, 0b00000000, 0b00000000, 0b00000001,  # Row 21
-    0b11100000, 0b00000000, 0b00000000, 0b00000000,  # Row 22
-    0b00000000, 0b00000000, 0b00000000, 0b01111000,  # Row 23
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 24
-    0b00000001, 0b11110000, 0b00000000, 0b00000000,  # Row 25
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 26
-    0b01111000, 0b00000000, 0b00000000, 0b00001111,  # Row 27
-    0b11000000, 0b00000111, 0b11111000, 0b00000000,  # Row 28
-    0b00111111, 0b00000000, 0b00000000, 0b00000000,  # Row 29
-    0b00000000, 0b01111100, 0b00000000, 0b00000000,  # Row 30
-    0b00111111, 0b11110000, 0b00001111, 0b11111110,  # Row 31
-    0b00000001, 0b11111111, 0b11000000, 0b00000000,  # Row 32
-    0b00010000, 0b01110000, 0b00111110, 0b00000000,  # Row 33
-    0b00000000, 0b01111111, 0b11111000, 0b00001111,  # Row 34
-    0b11111110, 0b00000011, 0b10000000, 0b11110000,  # Row 35
-    0b00111000, 0b11111100, 0b01111000, 0b00111111,  # Row 36
-    0b00000000, 0b00000000, 0b01111000, 0b01111100,  # Row 37
-    0b00000111, 0b11111000, 0b00000110, 0b00001110,  # Row 38
-    0b00111000, 0b00111111, 0b11111100, 0b01111000,  # Row 39
-    0b00011111, 0b11000000, 0b00000000, 0b00000000,  # Row 40
-    0b00111100, 0b00000011, 0b11110000, 0b00001100,  # Row 41
-    0b01111111, 0b10011100, 0b00111111, 0b11111000,  # Row 42
-    0b01111000, 0b00001111, 0b11110000, 0b00000000,  # Row 43
-    0b00000000, 0b00011110, 0b00000011, 0b11100000,  # Row 44
-    0b00011001, 0b11111111, 0b11001100, 0b00111111,  # Row 45
-    0b10000000, 0b01111000, 0b00000011, 0b11111100,  # Row 46
-    0b00000000, 0b00000000, 0b00011110, 0b00000011,  # Row 47
-    0b11100000, 0b00110011, 0b11111111, 0b11100110,  # Row 48
-    0b00111111, 0b00000000, 0b01111000, 0b00000001,  # Row 49
-    0b11111111, 0b00000000, 0b00000000, 0b00011110,  # Row 50
-    0b00000011, 0b11100000, 0b00110011, 0b11111111,  # Row 51
-    0b11110010, 0b00111110, 0b00000000, 0b01111000,  # Row 52
-    0b00000000, 0b00111111, 0b10000000, 0b00000000,  # Row 53
-    0b11111110, 0b00000011, 0b11100000, 0b00100111,  # Row 54
-    0b11111111, 0b11110011, 0b00111110, 0b00000000,  # Row 55
-    0b01111000, 0b00000000, 0b00011111, 0b11000000,  # Row 56
-    0b00011111, 0b11111110, 0b00000011, 0b11100000,  # Row 57
-    0b01100111, 0b11111111, 0b11111011, 0b00111110,  # Row 58
-    0b00000000, 0b01111000, 0b00000000, 0b00000111,  # Row 59
-    0b11000000, 0b01111111, 0b11111110, 0b00000011,  # Row 60
-    0b11100000, 0b01100111, 0b11111111, 0b11111011,  # Row 61
-    0b00111110, 0b00000000, 0b01111000, 0b00000000,  # Row 62
-    0b00000011, 0b11100000, 0b11111000, 0b00011110,  # Row 63
-    0b00000011, 0b11100000, 0b01100111, 0b11111111,  # Row 64
-    0b11111011, 0b00111100, 0b00000000, 0b01111000,  # Row 65
-    0b00000000, 0b00000011, 0b11100000, 0b11100000,  # Row 66
-    0b00011110, 0b00000001, 0b11000000, 0b01100111,  # Row 67
-    0b11111111, 0b11111011, 0b00111100, 0b00000000,  # Row 68
-    0b01111000, 0b00000000, 0b00000001, 0b11100001,  # Row 69
-    0b11100000, 0b00011110, 0b00000001, 0b11100000,  # Row 70
-    0b01100111, 0b11110011, 0b11111011, 0b00111100,  # Row 71
-    0b00000000, 0b01111000, 0b00000000, 0b00000001,  # Row 72
-    0b11100001, 0b11100000, 0b00011110, 0b00000001,  # Row 73
-    0b11100000, 0b01100111, 0b11110011, 0b11111011,  # Row 74
-    0b00111100, 0b00000000, 0b01111000, 0b00000000,  # Row 75
-    0b00000011, 0b11100001, 0b11100000, 0b00011110,  # Row 76
-    0b00000001, 0b11100000, 0b00110011, 0b11110011,  # Row 77
-    0b11111010, 0b00111100, 0b00000000, 0b01111000,  # Row 78
-    0b11110000, 0b00000011, 0b11000001, 0b11100000,  # Row 79
-    0b00011110, 0b00000001, 0b11100000, 0b00110001,  # Row 80
-    0b11100001, 0b11110110, 0b00111100, 0b00000000,  # Row 81
-    0b01111000, 0b11111100, 0b00001111, 0b11000001,  # Row 82
-    0b11100000, 0b00111110, 0b00000001, 0b11110000,  # Row 83
-    0b00011001, 0b11100001, 0b11111110, 0b00111100,  # Row 84
-    0b00000000, 0b01111100, 0b01111111, 0b11111111,  # Row 85
-    0b10000001, 0b11111000, 0b01111110, 0b00000000,  # Row 86
-    0b11111110, 0b00011100, 0b00000000, 0b11111100,  # Row 87
-    0b00111100, 0b00000000, 0b01111100, 0b00111111,  # Row 88
-    0b11111111, 0b00000000, 0b11111111, 0b11111111,  # Row 89
-    0b00000000, 0b11111110, 0b00001110, 0b00000000,  # Row 90
-    0b00111000, 0b00111100, 0b00000000, 0b01111100,  # Row 91
-    0b00011111, 0b11111110, 0b00000000, 0b01111111,  # Row 92
-    0b11001110, 0b00000000, 0b01111110, 0b00000111,  # Row 93
-    0b10000000, 0b01110000, 0b00111000, 0b00000000,  # Row 94
-    0b01111000, 0b00000011, 0b11110000, 0b00000000,  # Row 95
-    0b00011110, 0b00000000, 0b00000000, 0b00000000,  # Row 96
-    0b00000001, 0b11111111, 0b11100000, 0b00000000,  # Row 97
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 98
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 99
-    0b00000000, 0b00000000, 0b01111111, 0b00000000,  # Row 100
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 101
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 102
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 103
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 104
-]
+def download_file(url, filename):
+    try:
+        print(f"Downloading {filename} from {url}...")
+        response = urequests.get(url)
+        if response.status_code == 200:
+            with open(filename, 'w') as file:
+                file.write(response.text)
+            print(f"Downloaded and saved {filename}.")
+        else:
+            print(f"Failed to download {filename}: {response.status_code}")
+    except Exception as e:
+        print(f"Error downloading {filename}: {e}")
+    finally:
+        response.close()
 
-LOLLIPOP_BITMAP = [
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 1
-    0b00000000, 0b00000000, 0b00011111, 0b00000000,  # Row 2
-    0b00000000, 0b00000000, 0b11100000, 0b01100000,  # Row 3
-    0b00000000, 0b00000001, 0b11000011, 0b00010000,  # Row 4
-    0b00000000, 0b00000010, 0b10011000, 0b01101000,  # Row 5
-    0b00000000, 0b00000101, 0b00100000, 0b00011100,  # Row 6
-    0b00000000, 0b00000000, 0b01000111, 0b11001100,  # Row 7
-    0b00000000, 0b00001010, 0b01001000, 0b00100110,  # Row 8
-    0b00000000, 0b00001010, 0b00010111, 0b00010010,  # Row 9
-    0b00000000, 0b00000000, 0b10011100, 0b10001010,  # Row 10
-    0b00000000, 0b00000000, 0b10001100, 0b01001000,  # Row 11
-    0b00000000, 0b00000010, 0b01000110, 0b00001000,  # Row 12
-    0b00000000, 0b00000010, 0b01100110, 0b00001010,  # Row 13
-    0b00000000, 0b00001001, 0b00011000, 0b01001010,  # Row 14
-    0b00000000, 0b00001100, 0b10000010, 0b01001010,  # Row 15
-    0b00000000, 0b00000110, 0b01111100, 0b10010100,  # Row 16
-    0b00000000, 0b00000111, 0b00000001, 0b10010100,  # Row 17
-    0b00000000, 0b00000110, 0b11000110, 0b00101000,  # Row 18
-    0b00000000, 0b00001001, 0b00000000, 0b01110000,  # Row 19
-    0b00000000, 0b00010010, 0b01000000, 0b11000000,  # Row 20
-    0b00000000, 0b00100100, 0b00011111, 0b00000000,  # Row 21
-    0b00000000, 0b01001000, 0b00000000, 0b00000000,  # Row 22
-    0b00000000, 0b10010000, 0b00000000, 0b00000000,  # Row 23
-    0b00000001, 0b00100000, 0b00000000, 0b00000000,  # Row 24
-    0b00000010, 0b01000000, 0b00000000, 0b00000000,  # Row 25
-    0b00000100, 0b10000000, 0b00000000, 0b00000000,  # Row 26
-    0b00001001, 0b00000000, 0b00000000, 0b00000000,  # Row 27
-    0b00010010, 0b00000000, 0b00000000, 0b00000000,  # Row 28
-    0b00100100, 0b00000000, 0b00000000, 0b00000000,  # Row 29
-    0b01001000, 0b00000000, 0b00000000, 0b00000000,  # Row 30
-    0b00110000, 0b00000000, 0b00000000, 0b00000000,  # Row 31
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,  # Row 32
-]
-
-
-
-
-
-
-
-
-
-# LUT for full update
-WS_20_30 = [                                    
-    0x80,    0x66,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x40,    0x0,    0x0,    0x0,
-    0x10,    0x66,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x20,    0x0,    0x0,    0x0,
-    0x80,    0x66,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x40,    0x0,    0x0,    0x0,
-    0x10,    0x66,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x20,    0x0,    0x0,    0x0,
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,
-    0x14,    0x8,    0x0,    0x0,    0x0,    0x0,    0x2,                    
-    0xA,    0xA,    0x0,    0xA,    0xA,    0x0,    0x1,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x14,    0x8,    0x0,    0x1,    0x0,    0x0,    0x1,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x1,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,    0x0,                    
-    0x44,    0x44,    0x44,    0x44,    0x44,    0x44,    0x0,    0x0,    0x0,            
-    0x22,    0x17,    0x41,    0x0,    0x32,    0x36
-]
-
-
-WF_PARTIAL_2IN9 = [
-    0x0,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x80,0x80,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x40,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x80,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0A,0x0,0x0,0x0,0x0,0x0,0x1,  
-    0x1,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x1,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-    0x22,0x22,0x22,0x22,0x22,0x22,0x0,0x0,0x0,
-    0x22,0x17,0x41,0xB0,0x32,0x36,
-]
-
-class EPD_2in9_Landscape(framebuf.FrameBuffer):
-    def __init__(self):
-        self.reset_pin = Pin(RST_PIN, Pin.OUT)
-        self.busy_pin = Pin(BUSY_PIN, Pin.IN, Pin.PULL_UP)
-        self.cs_pin = Pin(CS_PIN, Pin.OUT)
-        self.width = EPD_WIDTH
-        self.height = EPD_HEIGHT
-        self.partial_lut = WF_PARTIAL_2IN9
-        self.full_lut = WS_20_30
-        self.spi = SPI(1)
-        self.spi.init(baudrate=4000_000)
-        self.dc_pin = Pin(DC_PIN, Pin.OUT)
-        self.buffer = bytearray(self.height * self.width // 8)
-        super().__init__(self.buffer, self.height, self.width, framebuf.MONO_VLSB)
-        self.init()
-
-    def digital_write(self, pin, value):
-        pin.value(value)
-
-    def digital_read(self, pin):
-        return pin.value()
-
-    def delay_ms(self, delaytime):
-        utime.sleep(delaytime / 1000.0)
-
-    def spi_writebyte(self, data):
-        self.spi.write(bytearray(data))
-
-    def module_exit(self):
-        self.digital_write(self.reset_pin, 0)
-
-    # Hardware reset
-    def reset(self):
-        self.digital_write(self.reset_pin, 1)
-        self.delay_ms(50) 
-        self.digital_write(self.reset_pin, 0)
-        self.delay_ms(2)
-        self.digital_write(self.reset_pin, 1)
-        self.delay_ms(50)   
-
-    def send_command(self, command):
-        self.digital_write(self.dc_pin, 0)
-        self.digital_write(self.cs_pin, 0)
-        self.spi_writebyte([command])
-        self.digital_write(self.cs_pin, 1)
-
-    def send_data(self, data):
-        self.digital_write(self.dc_pin, 1)
-        self.digital_write(self.cs_pin, 0)
-        self.spi_writebyte([data])
-        self.digital_write(self.cs_pin, 1)
-        
-    def send_data1(self, buf):
-        self.digital_write(self.dc_pin, 1)
-        self.digital_write(self.cs_pin, 0)
-        self.spi.write(bytearray(buf))
-        self.digital_write(self.cs_pin, 1)
-        
-    def ReadBusy(self):
-        print("e-Paper busy")
-        while(self.digital_read(self.busy_pin) == 1):      #  0: idle, 1: busy
-            self.delay_ms(10) 
-        print("e-Paper busy release")  
-
-    def TurnOnDisplay(self):
-        self.send_command(0x22) # DISPLAY_UPDATE_CONTROL_2
-        self.send_data(0xC7)
-        self.send_command(0x20) # MASTER_ACTIVATION
-        self.ReadBusy()
-
-    def TurnOnDisplay_Partial(self):
-        self.send_command(0x22) # DISPLAY_UPDATE_CONTROL_2
-        self.send_data(0x0F)
-        self.send_command(0x20) # MASTER_ACTIVATION
-        self.ReadBusy()
-
-    def lut(self, lut):
-        self.send_command(0x32)
-        self.send_data1(lut[0:153])
-        self.ReadBusy()
-
-    def SetLut(self, lut):
-        self.lut(lut)
-        self.send_command(0x3f)
-        self.send_data(lut[153])
-        self.send_command(0x03)     # gate voltage
-        self.send_data(lut[154])
-        self.send_command(0x04)     # source voltage
-        self.send_data(lut[155])    # VSH
-        self.send_data(lut[156])    # VSH2
-        self.send_data(lut[157])    # VSL
-        self.send_command(0x2c)        # VCOM
-        self.send_data(lut[158])
-
-    def SetWindow(self, x_start, y_start, x_end, y_end):
-        self.send_command(0x44) # SET_RAM_X_ADDRESS_START_END_POSITION
-        # x point must be the multiple of 8 or the last 3 bits will be ignored
-        self.send_data((x_start>>3) & 0xFF)
-        self.send_data((x_end>>3) & 0xFF)
-        self.send_command(0x45) # SET_RAM_Y_ADDRESS_START_END_POSITION
-        self.send_data(y_start & 0xFF)
-        self.send_data((y_start >> 8) & 0xFF)
-        self.send_data(y_end & 0xFF)
-        self.send_data((y_end >> 8) & 0xFF)
-
-    def SetCursor(self, x, y):
-        self.send_command(0x4E) # SET_RAM_X_ADDRESS_COUNTER
-        self.send_data(x & 0xFF)
-        
-        self.send_command(0x4F) # SET_RAM_Y_ADDRESS_COUNTER
-        self.send_data(y & 0xFF)
-        self.send_data((y >> 8) & 0xFF)
-        self.ReadBusy()
-        
-    def init(self):
-        # EPD hardware init start     
-        self.reset()
-
-        self.ReadBusy()   
-        self.send_command(0x12)  #SWRESET
-        self.ReadBusy()   
-
-        self.send_command(0x01) #Driver output control      
-        self.send_data(0x27)
-        self.send_data(0x01)
-        self.send_data(0x00)
-    
-        self.send_command(0x11) #data entry mode       
-        self.send_data(0x07)
-
-        self.SetWindow(0, 0, self.width-1, self.height-1)
-
-        self.send_command(0x21) #  Display update control
-        self.send_data(0x00)
-        self.send_data(0x80)
-    
-        self.SetCursor(0, 0)
-        self.ReadBusy()
-
-        self.SetLut(self.full_lut)
-        # EPD hardware init end
-        return 0
-
-    def display(self, image):
-        if (image == None):
-            return            
-        self.send_command(0x24) # WRITE_RAM
-        for j in range(int(self.width / 8) - 1, -1, -1):
-            for i in range(0, self.height):
-                self.send_data(image[i + j * self.height])   
-        self.TurnOnDisplay()
-
-    def display_Base(self, image):
-        if (image == None):
-            return   
-        self.send_command(0x24) # WRITE_RAM
-        for j in range(int(self.width / 8) - 1, -1, -1):
-            for i in range(0, self.height):
-                self.send_data(image[i + j * self.height])    
-                
-        self.send_command(0x26) # WRITE_RAM
-        for j in range(int(self.width / 8) - 1, -1, -1):
-            for i in range(0, self.height):
-                self.send_data(image[i + j * self.height])      
-                
-        self.TurnOnDisplay()
-
-    def display_Partial(self, image):
-        if (image == None):
-            return
-            
-        self.digital_write(self.reset_pin, 0)
-        self.delay_ms(2)
-        self.digital_write(self.reset_pin, 1)
-        self.delay_ms(2)   
-        self.SetLut(self.partial_lut)
-        self.send_command(0x37) 
-        self.send_data(0x00)  
-        self.send_data(0x00)  
-        self.send_data(0x00)  
-        self.send_data(0x00) 
-        self.send_data(0x00)  
-        self.send_data(0x40)  
-        self.send_data(0x00)  
-        self.send_data(0x00)   
-        self.send_data(0x00)  
-        self.send_data(0x00)
-        self.send_command(0x3C) #BorderWaveform
-        self.send_data(0x80)
-        self.send_command(0x22) 
-        self.send_data(0xC0)   
-        self.send_command(0x20) 
-        self.ReadBusy()
-        self.SetWindow(0, 0, self.width - 1, self.height - 1)
-        self.SetCursor(0, 0)
-        self.send_command(0x24) # WRITE_RAM
-        for j in range(int(self.width / 8) - 1, -1, -1):
-            for i in range(0, self.height):
-                self.send_data(image[i + j * self.height])    
-        self.TurnOnDisplay_Partial()
-
-    def Clear(self, color):
-        self.send_command(0x24) # WRITE_RAM
-        self.send_data1([color] * self.height * int(self.width / 8))
-        self.send_command(0x26) # WRITE_RAM
-        self.send_data1([color] * self.height * int(self.width / 8))
-        self.TurnOnDisplay()
-
-    def sleep(self):
-        self.send_command(0x10) # DEEP_SLEEP_MODE
-        self.send_data(0x01)
-        
-        self.delay_ms(2000)
-        self.module_exit()
-
-
-def connect_wifi():
+def connect_wifi(ssid, password, retries=20, delay=1):
+    """Connect to WiFi network with retry mechanism."""
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    if not wlan.isconnected():
-        wlan.connect(SSID, PASSWORD)
-        while not wlan.isconnected():
-            utime.sleep(1)
-    print("Wi-Fi connected:", wlan.ifconfig()[0])
 
+    if wlan.isconnected():
+        print("Already connected to Wi-Fi")
+        return True
 
-def fetch_all_address_info(addresses):
-    total_balance = 0.0
-    total_assets = {"SATORI": 0.0, "LOLLIPOP": 0.0}  # Initialize only the needed assets
+    wlan.connect(ssid, password)
+    attempt = 0
+    
+    while not wlan.isconnected() and attempt < retries:
+        print(f"WiFi connection attempt {attempt + 1}/{retries}")
+        utime.sleep(delay)
+        attempt += 1
 
-    for address in addresses:
-        attempt = 0  # Track retry attempts
-        success = False
-        while attempt < 3 and not success:  # Retry up to 3 times
-            try:
-                api_url = f"https://evr.cryptoscope.io/api/getaddress/?address={address}"
-                response = urequests.get(api_url)
-                if response.status_code == 200:
-                    data = response.json()
-                    total_balance += float(data.get("balance", 0.0))
+    if wlan.isconnected():
+        print("WiFi connected:", wlan.ifconfig()[0])
+        return True
+    print("Failed to connect to WiFi")
+    return False
 
-                    # Filter and aggregate only SATORI and LOLLIPOP
-                    assets = data.get("assets", {})
-                    for asset in ["SATORI", "LOLLIPOP"]:
-                        if asset in assets:
-                            try:
-                                total_assets[asset] += float(assets[asset])
-                            except ValueError:
-                                print(f"Invalid value for {asset} in address {address}: {assets[asset]}")
-                    success = True  # Mark as successful
-                else:
-                    print(f"Failed to fetch data for {address}. Status code: {response.status_code}")
-            except Exception as e:
-                print(f"Error fetching data for {address} (attempt {attempt + 1}):", e)
-            finally:
-                attempt += 1
-                if not success and attempt < 3:
-                    time.sleep(2)  # Wait for 2 seconds before retrying
+class LEDControl:
+    def __init__(self, pin="LED"):
+        """Initialize the LED on the specified pin."""
+        self.led = machine.Pin(pin, machine.Pin.OUT)
 
-    return {"balance": total_balance, "assets": total_assets}
+    def turn_on(self):
+        """Turn the LED on."""
+        self.led.value(1)
 
+    def turn_off(self):
+        """Turn the LED off."""
+        self.led.value(0)
 
-class ScaledText:
-    def __init__(self, framebuf, display_width):
-        self.fb = framebuf
-        self.display_width = display_width  # Use the actual display width
+    def blink(self, on_time, off_time):
+        """Blink the LED once with specified ON and OFF durations."""
+        self.turn_on()
+        time.sleep(on_time)
+        self.turn_off()
+        time.sleep(off_time)
 
-    def draw_bitmap(self, x, y, bitmap, width, height, color=0):
-        """Draw a monochrome bitmap at a specified location."""
-        bytes_per_row = (width + 7) // 8  # Handle any width, including non-multiples of 8
-        
-        for row in range(height):  # Iterate over each row
-            for col in range(width):  # Iterate over each column
-                # Calculate the byte and bit position
-                byte_index = row * bytes_per_row + (col // 8)
-                bit_index = 7 - (col % 8)
-                
-                # Extract the bit from the bitmap
-                bit = (bitmap[byte_index] >> bit_index) & 0x01
-                if bit:
-                    self.fb.pixel(x + col, y + row, color)
+    def cleanup(self):
+        """Clean up resources."""
+        self.turn_off()
+        del self.led
 
-                    
-    def draw_scaled_text(self, text, x, y, scale=2, color=0):
-        """Draw text with custom scaling factor.
-        
-        Args:
-            text: String to display
-            x: X coordinate
-            y: Y coordinate
-            scale: Integer scaling factor (default 2)
-            color: Pixel color (0 or 1)
-        """
-        char_width = 8
-        char_height = 8
-        char_buf = bytearray(char_width * char_height)
-        char_fb = framebuf.FrameBuffer(char_buf, char_width, char_height, framebuf.MONO_VLSB)
-        
-        cur_x = x
-        for char in text:
-            char_fb.fill(0)
-            char_fb.text(char, 0, 0, 1)
-            for cy in range(char_height):
-                for cx in range(char_width):
-                    if char_fb.pixel(cx, cy):
-                        for sy in range(scale):
-                            for sx in range(scale):
-                                self.fb.pixel(
-                                    cur_x + cx * scale + sx,
-                                    y + cy * scale + sy,
-                                    color
-                                )
-            cur_x += char_width * scale
+class Settings:
+    def __init__(self):
+        self.WIFI_SSID = None
+        self.WIFI_PASSWORD = None
+        self.GMT_OFFSET = None
+        self.DATE_FORMAT = None
+        self.ADDRESSES = []
 
+    def validate_gmt_offset(self, value):
+        try:
+            offset = int(value)
+            if -12 <= offset <= 14:
+                return offset
+            else:
+                print("[Error] GMT Offset must be between -12 and +14.")
+        except ValueError:
+            print("[Error] GMT Offset must be an integer.")
+        return None
 
-    def center_text(self, text, y, scale=2, color=0):
-        """Center text horizontally on the display."""
-        char_width = 8
-        text_width = len(text) * char_width * scale
-        x = (self.display_width - text_width) // 2  # Use display width for centering
-        self.draw_scaled_text(text, x, y, scale, color)
-
-    def right_text(self, text, y, scale=2, color=0):
-        """Align text to the right edge of the display."""
-        char_width = 8
-        text_width = len(text) * char_width * scale
-        x = self.display_width - text_width  # Use display width for right alignment
-        self.draw_scaled_text(text, x, y, scale, color)
-
-def get_satori_avg_price():
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json'
-        }
-        r = urequests.get("https://safe.trade/api/v2/trade/public/tickers/satoriusdt", headers=headers)
-        
-        if r.status_code == 200:
-            data = r.json()
-            avg_price = float(data['avg_price'])
-            return avg_price
+    def validate_date_format(self, value):
+        valid_formats = {"dmy", "ymd", "mdy"}
+        if value in valid_formats:
+            return value
         else:
-            return None
+            print("[Error] Date format must be one of 'dmy', 'ymd', or 'mdy'.")
+        return None
+
+    def prompt_yes_no(self, prompt):
+        while True:
+            response = input(f"{prompt} (yes/y or no/n): ").strip().lower()
+            if response in {"yes", "y"}:
+                return True
+            elif response in {"no", "n"}:
+                return False
+            else:
+                print("[Error] Invalid response. Please enter 'yes', 'y', 'no', or 'n'.")
+
+    def load_or_create_settings(self):
+        ascii_art_banner = """
+╔════════════════════════════════════════════════════╗
+║                                                    ║
+║             Welcome to Satori Screen               ║
+║                                                    ║
+║              www.satorinet.io                      ║
+║                                                    ║
+╚════════════════════════════════════════════════════╝
+        """
+        print(ascii_art_banner)
+
+        if SETTINGS_FILE in os.listdir():
+            print("[OK] Settings file found. Loading...")
+            with open(SETTINGS_FILE, "r") as file:
+                lines = file.readlines()
+                if len(lines) < 4:
+                    raise ValueError("[Error] Settings file is malformed. It must have at least 4 lines.")
+
+                self.WIFI_SSID = lines[0].strip()
+                self.WIFI_PASSWORD = lines[1].strip()
+                self.GMT_OFFSET = self.validate_gmt_offset(lines[2].strip())
+                self.DATE_FORMAT = self.validate_date_format(lines[3].strip().lower())
+                self.ADDRESSES = [line.strip() for line in lines[4:]]
+
+                if self.GMT_OFFSET is None or self.DATE_FORMAT is None:
+                    self.handle_invalid_settings()
+                print("-----------------------------------------")
+                print("[OK] Settings loaded successfully:")
+                print(f"📡  WIFI_SSID: {self.WIFI_SSID}")
+                print(f"🔑  WIFI_PASSWORD: {self.WIFI_PASSWORD}")
+                print(f"🌍  GMT_OFFSET: {self.GMT_OFFSET}")
+                print(f"📅  DATE_FORMAT: {self.DATE_FORMAT}")
+                print(f"📍  ADDRESSES: {self.ADDRESSES}")
+                print("-----------------------------------------")
+                #time.sleep(1)
+                
+        else:
+            print("[Warning] Settings file not found. Please provide the settings:")
+
+            self.WIFI_SSID = input("[Input] Enter WiFi SSID: ").strip()
+            self.WIFI_PASSWORD = input("[Input] Enter WiFi Password: ").strip()
+
+            while True:
+                self.GMT_OFFSET = self.validate_gmt_offset(input("[Input] Enter GMT Offset (e.g., +10, -6): ").strip())
+                if self.GMT_OFFSET is not None:
+                    break
+
+            while True:
+                self.DATE_FORMAT = self.validate_date_format(input("[Input] Enter Date Format (dmy, ymd, mdy): ").strip().lower())
+                if self.DATE_FORMAT is not None:
+                    break
+
+            self.ADDRESSES = []
+            print("[Input] Enter addresses (one per line). Leave blank to finish:")
+            while True:
+                address = input("Address: ").strip()
+                if not address:
+                    break
+                self.ADDRESSES.append(address)
+
+            print("\n[Summary] Settings to be saved:")
+            print("-----------------------------------------")
+            print(f"📡  WIFI_SSID: {self.WIFI_SSID}")
+            print(f"🔑  WIFI_PASSWORD: {self.WIFI_PASSWORD}")
+            print(f"🌍  GMT_OFFSET: {self.GMT_OFFSET}")
+            print(f"📅  DATE_FORMAT: {self.DATE_FORMAT}")
+            print(f"📍  ADDRESSES: {self.ADDRESSES}")
+            print("-----------------------------------------")
+
+            if not self.prompt_yes_no("[Confirm] Save settings?"):
+                print("[Warning] Settings not saved. Please restart the program to re-enter settings.")
+                machine.reset()
+
+            print("[OK] Saving settings to file...")
+            with open(SETTINGS_FILE, "w") as file:
+                file.write(f"{self.WIFI_SSID}\n")
+                file.write(f"{self.WIFI_PASSWORD}\n")
+                file.write(f"{self.GMT_OFFSET}\n")
+                file.write(f"{self.DATE_FORMAT}\n")
+                for address in self.ADDRESSES:
+                    file.write(f"{address}\n")
+
+            print("[OK] Settings saved successfully.")
+
+    def handle_invalid_settings(self):
+        print("[Error] Settings file contains invalid values. Deleting the file and rebooting...")
+        try:
+            if SETTINGS_FILE in os.listdir():
+                os.remove(SETTINGS_FILE)
+                print("[OK] Settings file deleted.")
+            else:
+                print("[Warning] Settings file does not exist, nothing to delete.")
+
+            print("[Info] Rebooting the system...")
+            machine.reset()
+        except Exception as e:
+            print(f"[Error] Failed to delete file or reboot: {e}")
+            while True:
+                pass
+
+    def get_settings(self):
+        """
+        Return the loaded settings as a dictionary.
+        """
+        return {
+            "WIFI_SSID": self.WIFI_SSID,
+            "WIFI_PASSWORD": self.WIFI_PASSWORD,
+            "GMT_OFFSET": self.GMT_OFFSET,
+            "DATE_FORMAT": self.DATE_FORMAT,
+            "ADDRESSES": self.ADDRESSES,
+        }
+
+
+class GitHubUpdater:
+    def __init__(self, libraries):
+        self.libraries = libraries
+
+    def download_library(self, lib_name, url):
+        try:
+            print(f"Downloading library '{lib_name}' from {url}...")
+            response = urequests.get(url)
+
+            if response.status_code == 200 and response.content:
+                temp_filename = f"{lib_name}.tmp"
+                with open(temp_filename, "wb") as f:
+                    f.write(response.content)
+                os.rename(temp_filename, f"{lib_name}.py")
+                print(f"Library '{lib_name}' downloaded successfully.")
+            else:
+                print(f"Failed to download '{lib_name}'. HTTP Status Code: {response.status_code} or no content received.")
+            gc.collect()
+        except Exception as e:
+            print(f"Error downloading '{lib_name}': {e}")
+        finally:
+            if 'response' in locals() and response:
+                response.close()
+
+    def check_and_download_libraries(self):
+        for lib, url in self.libraries.items():
+            if NEEDS_UPDATE:
+             try:
+                if os.stat(f"{lib}.py"):
+                    continue
+             except:
+                 print(f"{lib}.py does not exist ")
+            print(f"Library '{lib}' Downloading...")
+            self.download_library(lib, url)
+            try:
+                __import__(lib)
+                print(f"Library '{lib}' imported successfully after downloading.")
+            except ImportError:
+                print(f"Failed to import '{lib}' even after downloading.")
+
+def save_last_update_time():
+    try:
+        with open(LAST_UPDATE_FILE, "w") as file:
+            file.write(str(time.time()))
+    except Exception as e:
+        print(f"Error saving last update time: {e}")
+
+def load_last_update_time():
+    try:
+        if LAST_UPDATE_FILE in os.listdir():
+            with open(LAST_UPDATE_FILE, "r") as file:
+                return float(file.read())
+        return None
+    except Exception as e:
+        print(f"Error loading last update time: {e}")
+        return None
+
+def can_update_screen():
+    last_update = load_last_update_time()
+    if last_update is None:
+        return True
+        
+    time_since_update = time.time() - last_update
+    print(f"Time since last update: {time_since_update:.1f}s")
+    return time_since_update >= UPDATE_INTERVAL
+
+if __name__ == "__main__":
+    # Initialize components
+    settings = Settings()
+    settings.load_or_create_settings()
+
+    
+    try:
+        # Load settings
+        config = settings.get_settings()
+        
+        # Extract configuration
+        WIFI_SSID = config["WIFI_SSID"]
+        WIFI_PASSWORD = config["WIFI_PASSWORD"]
+        GMT_OFFSET = config["GMT_OFFSET"]
+        DATE_FORMAT = config["DATE_FORMAT"]
+        ADDRESSES = config["ADDRESSES"]
+        
+        # Initialize LED control
+        led = LEDControl()
+        
+        # Check for update mode
+        led_on = True
+        start_time = time.time()
+        print("Checking for bootsel button press - Update mode")
+        
+        while time.time() - start_time < 5:
+            led.turn_on() if led_on else led.turn_off()
+            led_on = not led_on
+            
+            if rp2.bootsel_button() or NEEDS_UPDATE:
+                if NEEDS_UPDATE:
+                    if not connect_wifi(WIFI_SSID, WIFI_PASSWORD):
+                        raise Exception("WiFi connection failed")
+                print("Update mode activated")
+                
+                updater = GitHubUpdater(REQUIRED_LIBRARIES)
+                updater.check_and_download_libraries()
+                print("Update complete, rebooting...")
+                led.turn_on()
+                time.sleep(10)
+                machine.reset()
+            
+            time.sleep(0.05)
+        
+        # Connect to WiFi for normal operation
+        if not connect_wifi(WIFI_SSID, WIFI_PASSWORD):
+            raise Exception("WiFi connection failed")
+        print("WiFi Connected")
+        
+        # Initialize components
+        watchdog = Watchdog()
+        historical_data = HistoricalData()        
+        display_service = DisplayService(EPD_WIDTH, EPD_HEIGHT)
+        watchdog.feed()
+        
+        # Set system time
+        ntp_client = NTPClient(timezone_gmt_offset=GMT_OFFSET)
+        ntp_client.set_time()
+        
+        led.turn_off()
+        led_on = True
+
+        while True:
+            watchdog.feed()
+            
+            if can_update_screen():
+                # Fetch all data using the display service
+                balance_data = display_service.fetch_all_address_info(ADDRESSES, watchdog)
+                neurons_data = display_service.fetch_neurons_data(watchdog)
+                satori_price = display_service.get_satori_price(watchdog)
+                
+                # Update historical data and get statistics
+                if historical_data.update_data(balance_data, neurons_data, satori_price):
+                    stats = historical_data.get_statistics()
+                    
+                    # Initialize display
+                    watchdog.feed()
+                    epd = EPD_2in9_Landscape()
+                    text_handler = ScaledText(epd, EPD_WIDTH)
+                    
+                    gc.collect()
+                    
+                    # Update display using the display service
+                    display_service.update_display(epd, text_handler, balance_data, neurons_data, satori_price, watchdog, stats)
+                    
+                    watchdog.feed()
+                    epd.display(epd.buffer)
+                    epd.sleep()
+                    watchdog.feed()
+                    
+                    # Save update time
+                    save_last_update_time()
+                    SECONDS_IN_HOUR = 3600
+                    counter = 0
+
+                    # Blink LED to indicate successful update
+                    while True:
+                        time.sleep(1)
+                        counter += 1
+                        led.turn_on() if led_on else led.turn_off()
+                        led_on = not led_on
+                        watchdog.feed()
+                        if counter >= SECONDS_IN_HOUR:
+                            machine.reset()
+                        
+            
+            # Wait before next check
+            time.sleep(0.5)
+            led.turn_on() if led_on else led.turn_off()
+            led_on = not led_on            
             
     except Exception as e:
-        return None
+        print(f"Runtime error: {e}")
+        machine.reset()
     finally:
-        r.close()  # Clean up the connection
-        
-def get_ntp_time():
-    NTP_SERVER = "pool.ntp.org"
-    NTP_PORT = 123
-    NTP_DELTA = 2208988800  # seconds between 1900 and 1970
-    
-    # NTP request packet
-    ntp_query = bytearray(48)
-    ntp_query[0] = 0x1B  # Version 3, Mode 3 (client)
-    
-    # Create a UDP socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        addr = socket.getaddrinfo(NTP_SERVER, NTP_PORT)[0][-1]
-        sock.settimeout(2)
-        sock.sendto(ntp_query, addr)
-        msg = sock.recv(48)
-        
-        # Extract timestamp from response
-        val = struct.unpack("!I", msg[40:44])[0]
-        utc_time = val - NTP_DELTA
-        
-        # Adjust for timezone offset
-        local_time = utc_time + TIMEZONE_GMT_OFFSET * 3600
-        return local_time
-    except:
-        return None
-    finally:
-        sock.close()
-
-
-def set_time():
-    timestamp = None
-    # Try up to 3 times to get NTP time
-    for _ in range(3):
-        timestamp = get_ntp_time()
-        if timestamp is not None:
-            break
-        time.sleep(1)
-    
-    if timestamp is None:
-        raise RuntimeError('Could not get NTP time')
-    
-    # Set RTC
-    tm = time.gmtime(timestamp)
-    machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-    
-def disconnect_wifi():
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(False)  # Turn off Wi-Fi
-    wlan.disconnect()
-    print("Wi-Fi disconnected.")
-
-def fetch_neurons_data():
-    """
-    Fetches the Neurons data from the SatoriNet report URL.
-    Returns the Competing Neurons count or None if the request fails.
-    """
-    try:
-        url = "https://satorinet.io/reports/daily/stats/predictors/latest"
-        headers = {'Accept': 'application/json'}
-        response = urequests.get(url, headers=headers)
-        
-        # Debug: Print raw response text
-        raw_content = response.text
-        print("Raw response content:", raw_content)
-        
-        # Replace NaN with null to make the JSON valid
-        valid_json_content = raw_content.replace("NaN", "null")
-        
-        # Parse cleaned JSON content using ujson
-        data = ujson.loads(valid_json_content)
-        neurons = int(data.get("Competing Neurons", 0))  # Fetch Competing Neurons
-        return neurons
-    except Exception as e:
-        print("Error fetching neurons data:", e)
-        return None
-    finally:
-        try:
-            response.close()  # Ensure the connection is closed
-        except:
-            pass
-
-def load_previous_data():
-    """Load previous day's SATORI and EVR values from storage."""
-    try:
-        if STORAGE_FILE in os.listdir():
-            with open(STORAGE_FILE, "r") as file:
-                data = ujson.load(file)
-                return data
-        else:
-            return {"SATORI": 0.0, "EVR": 0.0}  # Default values
-    except Exception as e:
-        print("Error loading previous data:", e)
-        return {"SATORI": 0.0, "EVR": 0.0}
-
-def save_current_data(satori, evr):
-    """Save the current day's SATORI and EVR values to storage."""
-    try:
-        data = {"SATORI": satori, "EVR": evr}
-        with open(STORAGE_FILE, "w") as file:
-            ujson.dump(data, file)
-    except Exception as e:
-        print("Error saving data:", e)
-
-
-
-
-
-def main():
-    connect_wifi()
-
-        # Fetch data for all wallet addresses
-    data = fetch_all_address_info(WALLET_ADDRESSES)
-    if not data:
-        print("Failed to fetch data. Exiting.")
-        return
-    
-    # Fetch Neurons data
-    neurons = fetch_neurons_data()
-    if neurons is None:
-        neurons = "N/A"
-    else:
-        neurons = f"{neurons:,}"  # Format number with commas
-        
-    # Parse the aggregated data
-    evr_balance = data.get("balance", 0.0)
-    assets = data.get("assets", {})
-    print("Aggregated Assets:", assets)
-
-    # Determine SATORI balance and price
-    satori_balance = assets.get("SATORI", 0.0)
-    satoriprice = get_satori_avg_price()
-
-    # Initialize display
-    epd = EPD_2in9_Landscape()
-    epd.Clear(0xff)
-
-    # Create scaled text handler
-    text_handler = ScaledText(epd, EPD_WIDTH)
-    epd.fill(1)
-
-    # Display SATORI section
-    #text_handler.draw_scaled_text("SATORI", 30, 0, scale=3)
-    #text_handler.draw_bitmap((128*2)+5, 0, SATORI_BITMAP, 32, 32)
-    #text_handler.draw_bitmap(0, 0, SATORI_BITMAP, 32, 32)
-    text_handler.draw_bitmap(0, 0, SATORI, 103, 32)
-    
-    text_handler.draw_scaled_text(f"{satori_balance:.2f}", 0, 40, scale=3)
-    
-
-
-    if satoriprice is not None:
-        base_x = 200  # Base X-coordinate
-        char_offset = 16  # Number of pixels to adjust per extra character
-        satoriprice_str = str(satoriprice)  # Convert to string
-        
-        adjusted_x = base_x - (max(0, len(satoriprice_str) - 5) * char_offset)
-
-        #text_handler.draw_scaled_text(f"${satoriprice}", 170, 0, scale=2)
-        
-        text_handler.draw_scaled_text(f"${satoriprice}", adjusted_x, 0, scale=2)
-    else:
-        text_handler.draw_scaled_text("Price N/A", 170, 30, scale=2)
-
-    
-    # Draw EVRMORE balance
-    text_handler.draw_scaled_text(f"EVR: {evr_balance:.2f}", 0, 80, scale=2)
-    #text_handler.draw_scaled_text(f"{evr_balance:.2f}", 140, y_offset, scale=2)
-
-    # Add updated timestamp
-    current_time = time.localtime()
-    text_handler.draw_scaled_text("Updated: %02d:%02d %02d/%02d/%02d" % 
-        (current_time[3], current_time[4], current_time[2], current_time[1], current_time[0] % 100), 0, 112, scale=1)
-
-    # Draw version information ##PLACEHOLDERS##
-    text_handler.draw_scaled_text(f"VER: v0.3.1 NEURONS: {neurons} STAKE: 10", 0, 120 , scale=1)
-
-    # Optional: Draw LOLLIPOP bitmap if present
-    if "LOLLIPOP" in assets:
-        text_handler.draw_bitmap(261, 86, LOLLIPOP_BITMAP, 32, 32)
-        
-        
-            # Load previous data
-    previous_data = load_previous_data()
-    prev_satori = previous_data.get("SATORI", 0.0)
-    prev_evr = previous_data.get("EVR", 0.0)
-
-    # Calculate changes
-    satori_change = satori_balance - prev_satori
-    evr_change = evr_balance - prev_evr
-
-    # Format change as string with indicator
-    satori_change_str = f"{satori_change:.2f}" if satori_change < 0 else f"+{satori_change:.2f}"
-    evr_change_str = f"{evr_change:.2f}" if evr_change < 0 else f"+{evr_change:.2f}"
-
-    # Display the changes
-    text_handler.draw_scaled_text(f"{satori_change_str}", 0, 64, scale=1)
-    text_handler.draw_scaled_text(f"{evr_change_str}", 0, 96, scale=1)
-
-
-
-
-
-    disconnect_wifi()  # Disconnect Wi-Fi to save power
-    epd.display(epd.buffer)
-    epd.sleep()
-
-    print("Rebooting in 60 minutes...")
-    
-    time.sleep(3600)
-    
-    machine.reset()
-    
-if __name__ == "__main__":
-    main()
+        watchdog.cleanup()
+        led.cleanup()
