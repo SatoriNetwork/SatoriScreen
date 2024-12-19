@@ -7,6 +7,7 @@ import time
 from scaled_text import ScaledText
 from bitmaps import SATORI_BITMAP, LOLLIPOP_BITMAP, SATORI_LOGO
 
+
 class DisplayService:
     def __init__(self, epd_width=128, epd_height=296):
         self.EPD_WIDTH = epd_width
@@ -100,6 +101,9 @@ class DisplayService:
         """Update the e-paper display with current data."""
         try:
             print("Starting display update...")
+            
+
+            
             epd.fill(1)
             watchdog.feed()
 
@@ -164,6 +168,12 @@ class DisplayService:
                             f"24h: {stats['price_change']:+.2f}%",
                             0, y_position, scale=1
                         )
+#                     y_position = 100
+#                     if 'price_change' in stats:
+#                         text_handler.draw_scaled_text(
+#                             f"24h: {stats['price_change']:+.2f}%",
+#                             0, y_position, scale=1
+                        #)                        
             except Exception as e:
                 print(f"Error drawing historical stats: {e}")
 
