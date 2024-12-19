@@ -2,6 +2,7 @@
 
 import urequests
 import ujson
+import gc
 import time
 from scaled_text import ScaledText
 from bitmaps import SATORI_BITMAP, LOLLIPOP_BITMAP, SATORI_LOGO
@@ -15,12 +16,17 @@ class DisplayService:
         """Fetch current Satori Network statistics."""
         try:
             watchdog.feed()
+            gc.collect()
             response = urequests.get(
                 "https://satorinet.io/reports/daily/stats/predictors/latest",
                 headers={'Accept': 'application/json'}
             )
             valid_json = response.text.replace("NaN", "null")
+            response=None
+            gc.collect()
             data = ujson.loads(valid_json)
+            valid_json=None
+            gc.collect()
             
             return {
                 "current_stake_requirement": float(data.get("Current Staking Requirement", 0.0)),
@@ -45,15 +51,20 @@ class DisplayService:
             for attempt in range(3):
                 try:
                     watchdog.feed()
+                    gc.collect()
                     response = urequests.get(f"https://evr.cryptoscope.io/api/getaddress/?address={address}")
                     if response.status_code == 200:
                         data = response.json()
+                        response=None
+                        gc.collect()
                         total_balance += float(data.get("balance", 0.0))
                         
                         assets = data.get("assets", {})
                         for asset in total_assets:
                             if asset in assets:
                                 total_assets[asset] += float(assets[asset])
+                        data = None
+                        gc.collect()
                         break
                 except Exception as e:
                     print(f"Error fetching address {address} (attempt {attempt + 1}): {e}")
@@ -70,6 +81,7 @@ class DisplayService:
                 'User-Agent': 'Mozilla/5.0',
                 'Accept': 'application/json'
             }
+            gc.collect()
             response = urequests.get("https://safe.trade/api/v2/trade/public/tickers/satoriusdt", 
                                 headers=headers)
             if response.status_code == 200:
