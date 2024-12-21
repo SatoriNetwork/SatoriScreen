@@ -101,8 +101,9 @@ def download_file(url, filename):
         print(f"Error downloading {filename}: {e}")
     finally:
         response.close()
-
+wlan = None
 def connect_wifi(ssid, password, retries=20, delay=1):
+    global wlan
     """Connect to WiFi network with retry mechanism."""
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -474,6 +475,12 @@ if __name__ == "__main__":
                 counter = 0
 
                 # Blink LED to indicate successful update
+                
+                #Low power mode.  19 MA vs ~150 ma while active
+                wlan.active(False)
+                wlan.disconnect()
+                wlan.deinit()
+                machine.freq(64000000)
                 while True:
                     time.sleep(1)
                     counter += 1
