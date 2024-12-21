@@ -63,8 +63,18 @@ Connect the RPI Pico to the Waveshare screen:
 ### png2bmparray.py
 Converts PNG images to bitmap arrays for display compatibility
 
-### main.py
-Primary script containing core functionality
+
+## Battery Operation ##
+
+I am currently designing an aditional circuit for battery operation using a ATTINY85 microcontroller.  
+When used as a timer in sleep mode consumes 5um.  
+The whole system should operate off 2 X AA Batteries for over 2 years
+
+
+
+
+
+
 
 ## License
 MIT
